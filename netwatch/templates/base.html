@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} · {{ APP_NAME }}</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/icons/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ APP_VERSION }}">
+</head>
+<body>
+{% set ep = request.endpoint or '' %}
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="nw-shell">
+  <aside class="nw-sidebar" id="sidebar" aria-label="Main navigation">
+    <a class="nw-brand" href="{{ url_for('dashboard.index') }}">
+      <span class="nw-logo"><i class="bi bi-activity" aria-hidden="true"></i></span>
+      <span><strong>{{ APP_NAME }}</strong><small>Cloud network monitoring</small></span>
+    </a>
+    <nav class="nw-nav">
+      <div class="nw-section">Monitor</div>
+      <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if ep == 'dashboard.index' }}"><i class="bi bi-grid-1x2" aria-hidden="true"></i>Dashboard</a>
+      <a href="{{ url_for('devices.index') }}" class="{{ 'active' if ep.startswith('devices.') }}"><i class="bi bi-hdd-network" aria-hidden="true"></i>Devices</a>
+      <a href="{{ url_for('alerts.index') }}" class="{{ 'active' if ep.startswith('alerts.') }}"><i class="bi bi-bell" aria-hidden="true"></i>Alerts
+        {% if nav_open_alerts %}<span class="badge rounded-pill text-bg-danger" aria-label="{{ nav_open_alerts }} open alerts">{{ nav_open_alerts }}</span>{% endif %}</a>
+      <div class="nw-section">Analyse</div>
+      <a href="{{ url_for('history.index') }}" class="{{ 'active' if ep.startswith('history.') }}"><i class="bi bi-clock-history" aria-hidden="true"></i>History</a>
+      <a href="{{ url_for('reports.index') }}" class="{{ 'active' if ep.startswith('reports.') }}"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i>Reports</a>
+      {% if current_user.is_admin %}
+      <div class="nw-section">Administer</div>
+      <a href="{{ url_for('users.index') }}" class="{{ 'active' if ep.startswith('users.') }}"><i class="bi bi-people" aria-hidden="true"></i>Users</a>
+      <a href="{{ url_for('settings.audit_log') }}" class="{{ 'active' if ep == 'settings.audit_log' }}"><i class="bi bi-journal-text" aria-hidden="true"></i>Audit log</a>
+      <a href="{{ url_for('settings.index') }}" class="{{ 'active' if ep == 'settings.index' }}"><i class="bi bi-sliders" aria-hidden="true"></i>Settings</a>
+      {% endif %}
+    </nav>
+    <div class="nw-sidebar-foot">
+      <div id="sched-state" data-url="{{ url_for('api.healthz') }}"><span class="dot" style="background:#64748b"></span>Checking collector…</div>
+      <div class="mt-1">v{{ APP_VERSION }} · times in {{ DISPLAY_TZ }}</div>
+    </div>
+  </aside>
+  <div class="nw-backdrop" id="sidebar-backdrop"></div>
+
+  <div class="nw-main">
+    <header class="nw-topbar">
+      <button class="btn btn-sm btn-outline-secondary d-lg-none" id="sidebar-toggle" aria-controls="sidebar" aria-expanded="false" aria-label="Open navigation"><i class="bi bi-list" aria-hidden="true"></i></button>
+      <p class="nw-title">{% block crumb %}{{ self.title() }}{% endblock %}</p>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <a href="{{ url_for('alerts.index') }}" class="btn btn-sm btn-outline-secondary position-relative" aria-label="Alerts ({{ nav_open_alerts }} open)">
+          <i class="bi bi-bell" aria-hidden="true"></i>
+          {% if nav_open_alerts %}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-danger">{{ nav_open_alerts }}</span>{% endif %}
+        </a>
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-circle" aria-hidden="true"></i> <span class="d-none d-sm-inline">{{ current_user.username }}</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><span class="dropdown-item-text small text-muted">Signed in as <b>{{ current_user.username }}</b><br>{{ 'Administrator' if current_user.is_admin else 'Viewer (read-only)' }}</span></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}"><i class="bi bi-person-gear me-2" aria-hidden="true"></i>Profile &amp; password</a></li>
+            <li>
+              <form method="post" action="{{ url_for('auth.logout') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="dropdown-item" type="submit"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Sign out</button>
+              </form>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </header>
+
+    <div class="toast-zone" aria-live="polite">
+      {% for cat, msg in get_flashed_messages(with_categories=true) %}
+      <div class="alert alert-{{ 'danger' if cat == 'error' else cat }} alert-dismissible fade show" role="{{ 'alert' if cat in ('danger', 'error', 'warning') else 'status' }}">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
+      </div>
+      {% endfor %}
+    </div>
+
+    <main class="nw-content" id="main" tabindex="-1">
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="nw-footer">
+      {{ APP_NAME }} — Design and Implementation of a Cloud-Based Network Monitoring System for a Small Organisation · Yaba College of Technology, Department of Computer Science (NCC)
+    </footer>
+  </div>
+</div>
+
+<!-- Confirmation dialog used by every destructive action -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h2 class="modal-title fs-5" id="confirmTitle">Are you sure?</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cancel"></button></div>
+      <div class="modal-body" id="confirmBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmGo">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+{% block scripts_vendor %}{% endblock %}
+<script src="{{ url_for('static', filename='js/app.js') }}?v={{ APP_VERSION }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

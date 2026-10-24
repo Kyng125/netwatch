@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import field %}
+{% block title %}Edit threshold{% endblock %}
+{% block content %}
+<div class="page-head"><div>
+  <a href="{{ url_for('devices.detail', device_id=t.device_id) }}#thresholds" class="small text-decoration-none"><i class="bi bi-arrow-left" aria-hidden="true"></i> {{ t.device.device_name }}</a>
+  <h1 class="mt-1">Edit threshold rule</h1><p>An alert opens when the metric first meets this condition and closes automatically when it no longer does.</p></div></div>
+<form method="post" class="card" style="max-width:640px" novalidate>
+  {{ form.csrf_token }}
+  <div class="card-body">
+    {{ field(form.metric_name) }}
+    <div class="row">{{ field(form.comparison_operator, cls='col-sm-7') }}{{ field(form.threshold_value, cls='col-sm-5') }}</div>
+    {{ field(form.severity) }}
+    {{ field(form.enabled, help='Turning a rule off closes any alert it raised.') }}
+  </div>
+  <div class="card-footer bg-transparent d-flex justify-content-end gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('devices.detail', device_id=t.device_id) }}#thresholds">Cancel</a>
+    <button class="btn btn-primary" type="submit">Save rule</button>
+  </div>
+</form>
+{% endblock %}

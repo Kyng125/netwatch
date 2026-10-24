@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import sim_badge %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+{% set qs = {'start': r.start.isoformat(), 'end': r.end.isoformat(), 'device': r.selected} %}
+<div class="page-head">
+  <div><h1>Performance report</h1><p>Descriptive statistics (minimum, mean, maximum) computed from stored monitoring results for the selected devices and period.</p></div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('reports.export_csv', **qs) }}"><i class="bi bi-filetype-csv" aria-hidden="true"></i> CSV</a>
+    <a class="btn btn-primary" href="{{ url_for('reports.export_pdf', **qs) }}"><i class="bi bi-filetype-pdf" aria-hidden="true"></i> Download PDF</a>
+  </div>
+</div>
+
+<form class="card mb-3" method="get">
+  <div class="card-body row g-3 align-items-end">
+    <div class="col-sm-6 col-lg-3"><label class="form-label" for="r-start">From</label><input type="date" class="form-control" id="r-start" name="start" value="{{ r.start.isoformat() }}"></div>
+    <div class="col-sm-6 col-lg-3"><label class="form-label" for="r-end">To</label><input type="date" class="form-control" id="r-end" name="end" value="{{ r.end.isoformat() }}"></div>
+    <div class="col-lg-4"><label class="form-label" for="r-dev">Devices <span class="text-muted small">(none selected = all)</span></label>
+      <select class="form-select" id="r-dev" name="device" multiple size="4">
+        {% for d in devices %}<option value="{{ d.device_id }}" {{ 'selected' if d.device_id in r.selected }}>{{ d.device_name }}{{ ' (simulated)' if d.is_simulated }}</option>{% endfor %}
+      </select><div class="form-text">Hold Ctrl (⌘ on Mac) to select several.</div></div>
+    <div class="col-lg-2 d-grid gap-2"><button class="btn btn-primary" type="submit">Generate</button>
+      <a class="btn btn-link btn-sm" href="{{ url_for('reports.index') }}">Reset</a></div>
+  </div>
+</form>
+
+<div class="row g-3 mb-3">
+  {% for label, val in [('Devices', r.totals.devices), ('Checks analysed', '{:,}'.format(r.totals.checks)), ('Overall uptime', r.totals.uptime|num(2, '%')), ('Alerts opened', r.totals.alerts)] %}
+  <div class="col-6 col-lg-3"><div class="card stat"><span class="label">{{ label }}</span><span class="value">{{ val }}</span></div></div>
+  {% endfor %}
+</div>
+{% if r.totals.simulated %}<div class="sim-banner mb-3"><i class="bi bi-cpu" aria-hidden="true"></i> {{ r.totals.simulated }} device{{ 's' if r.totals.simulated != 1 }} in this report {{ 'are' if r.totals.simulated != 1 else 'is' }} simulated; those rows contain synthetic values and are marked in the CSV and PDF.</div>{% endif %}
+
+<div class="card">
+  <div class="card-header"><h2>{{ r.start.strftime('%d %b %Y') }} – {{ r.end.strftime('%d %b %Y') }}</h2><span class="card-sub">Generated {{ generated|dt }}</span></div>
+  {% if r.rows %}
+  <div class="table-responsive"><table class="table">
+    <thead><tr><th scope="col">Device</th><th scope="col" class="text-end">Checks</th><th scope="col" class="text-end">Uptime</th>
+      <th scope="col" class="text-end">Latency min</th><th scope="col" class="text-end">avg</th><th scope="col" class="text-end">max</th>
+      <th scope="col" class="text-end">Loss avg</th><th scope="col" class="text-end">Loss max</th><th scope="col" class="text-end">Alerts</th></tr></thead>
+    <tbody>{% for d, s in r.rows %}
+      <tr><td><a href="{{ url_for('devices.detail', device_id=d.device_id) }}" class="text-decoration-none fw-semibold">{{ d.device_name }}</a> {{ sim_badge(d.is_simulated) }}<div class="small text-muted mono">{{ d.ip_address }}</div></td>
+        <td class="text-end num">{{ '{:,}'.format(s.checks) }}</td>
+        <td class="text-end num {{ 'text-down' if s.uptime is not none and s.uptime < 99 }}">{{ s.uptime|num(2, '%') }}</td>
+        <td class="text-end num">{{ s.latency_min|num(2) }}</td><td class="text-end num">{{ s.latency_avg|num(2) }}</td><td class="text-end num">{{ s.latency_max|num(2) }}</td>
+        <td class="text-end num">{{ s.loss_avg|num(1, '%') }}</td><td class="text-end num">{{ s.loss_max|num(0, '%') }}</td>
+        <td class="text-end num">{{ s.alerts }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <div class="card-body border-top small text-muted">Latency in milliseconds. Uptime = successful checks ÷ total checks in the period. “—” means no measurement was available (no checks, or every check failed).</div>
+  {% else %}
+  <div class="empty"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i><h3>No devices to report on</h3><p>Register a device first.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

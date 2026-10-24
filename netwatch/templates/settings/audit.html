@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import pagination %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+{% set args = {'action': action, 'user': user_id, 'start': start, 'end': end, 'per_page': page.per_page} %}
+<div class="page-head"><div><h1>Audit log</h1><p>Significant administrator actions — sign-ins, device and threshold changes, alert handling, exports and settings — recorded for accountability.</p></div></div>
+<div class="card">
+  <form class="filter-bar" method="get" data-autosubmit>
+    <div><label class="form-label" for="l-a">Action</label><select class="form-select form-select-sm" id="l-a" name="action"><option value="">All actions</option>
+      {% for a in actions %}<option value="{{ a }}" {{ 'selected' if a == action }}>{{ a.replace('_', ' ') }}</option>{% endfor %}</select></div>
+    <div><label class="form-label" for="l-u">User</label><select class="form-select form-select-sm" id="l-u" name="user"><option value="0">Anyone</option>
+      {% for u in users %}<option value="{{ u.user_id }}" {{ 'selected' if u.user_id == user_id }}>{{ u.username }}</option>{% endfor %}</select></div>
+    <div><label class="form-label" for="l-s">From</label><input type="date" class="form-control form-control-sm" id="l-s" name="start" value="{{ start }}"></div>
+    <div><label class="form-label" for="l-e">To</label><input type="date" class="form-control form-control-sm" id="l-e" name="end" value="{{ end }}"></div>
+    <input type="hidden" name="page" value="1">
+    <div><button class="btn btn-sm btn-primary" type="submit">Apply</button>{% if action or user_id or start or end %} <a class="btn btn-sm btn-link" href="{{ url_for('settings.audit_log') }}">Clear</a>{% endif %}</div>
+  </form>
+  {% if page.items %}
+  <div class="table-responsive"><table class="table">
+    <thead><tr><th scope="col">Time</th><th scope="col">User</th><th scope="col">Action</th><th scope="col">Details</th><th scope="col">IP</th></tr></thead>
+    <tbody>{% for e in page.items %}
+      <tr><td class="small text-nowrap">{{ e.log_time|dt }}</td><td>{{ e.user.username if e.user else '—' }}</td>
+        <td><span class="badge text-bg-light border">{{ e.action.replace('_', ' ') }}</span></td>
+        <td class="small">{{ e.details or '' }}{% if e.entity_type %} <span class="text-muted">({{ e.entity_type }}{% if e.entity_id %} #{{ e.entity_id }}{% endif %})</span>{% endif %}</td>
+        <td class="mono small">{{ e.ip_address or '' }}</td></tr>
+    {% endfor %}</tbody></table></div>
+  {{ pagination(page, 'settings.audit_log', args, 'entries') }}
+  {% else %}<div class="empty"><i class="bi bi-journal" aria-hidden="true"></i><h3>No entries match</h3></div>{% endif %}
+</div>
+{% endblock %}

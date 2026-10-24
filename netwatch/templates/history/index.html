@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import sim_badge, sort_th, pagination, method_badge %}
+{% block title %}History{% endblock %}
+{% block content %}
+{% set args = dict(p, per_page=page.per_page) %}
+<div class="page-head">
+  <div><h1>Monitoring history</h1><p>Every stored, time-stamped check result. Filter by device, period and outcome, then export what you see as CSV.</p></div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('history.export_csv', **p) }}"><i class="bi bi-filetype-csv" aria-hidden="true"></i> Export CSV</a>
+</div>
+<div class="card">
+  <form class="filter-bar" method="get" data-autosubmit>
+    <div class="grow"><label class="form-label" for="h-dev">Device</label>
+      <select class="form-select form-select-sm" id="h-dev" name="device"><option value="0">All devices</option>
+        {% for d in devices %}<option value="{{ d.device_id }}" {{ 'selected' if p.device == d.device_id }}>{{ d.device_name }}{{ ' (simulated)' if d.is_simulated }}</option>{% endfor %}</select></div>
+    <div><label class="form-label" for="h-start">From</label><input type="date" class="form-control form-control-sm" id="h-start" name="start" value="{{ p.start }}"></div>
+    <div><label class="form-label" for="h-end">To</label><input type="date" class="form-control form-control-sm" id="h-end" name="end" value="{{ p.end }}"></div>
+    <div><label class="form-label" for="h-out">Outcome</label>
+      <select class="form-select form-select-sm" id="h-out" name="outcome"><option value="">All</option>
+        <option value="up" {{ 'selected' if p.outcome == 'up' }}>Reachable</option><option value="down" {{ 'selected' if p.outcome == 'down' }}>Failed</option></select></div>
+    <div><label class="form-label" for="h-m">Method</label>
+      <select class="form-select form-select-sm" id="h-m" name="method"><option value="">Any</option>
+        {% for m in ['icmp','tcp','simulated'] %}<option value="{{ m }}" {{ 'selected' if p.method == m }}>{{ m|upper if m != 'simulated' else 'Simulated' }}</option>{% endfor %}</select></div>
+    <div><label class="form-label" for="h-pp">Rows</label>
+      <select class="form-select form-select-sm" id="h-pp" name="per_page">{% for n in [20, 50, 100] %}<option {{ 'selected' if page.per_page == n }}>{{ n }}</option>{% endfor %}</select></div>
+    <input type="hidden" name="sort" value="{{ p.sort }}"><input type="hidden" name="order" value="{{ p.order }}"><input type="hidden" name="page" value="1">
+    <div><button class="btn btn-sm btn-primary" type="submit">Apply</button></div>
+  </form>
+  {% if page.items %}
+  <div class="table-responsive"><table class="table">
+    <thead><tr>
+      {{ sort_th('Checked at', 'time', p.sort, p.order, 'history.index', args) }}
+      {{ sort_th('Device', 'device', p.sort, p.order, 'history.index', args) }}
+      <th scope="col">Result</th>
+      {{ sort_th('Latency', 'latency', p.sort, p.order, 'history.index', args) }}
+      {{ sort_th('Loss', 'loss', p.sort, p.order, 'history.index', args) }}
+      {{ sort_th('Uptime 24h', 'uptime', p.sort, p.order, 'history.index', args) }}
+      <th scope="col">CPU / Mem</th><th scope="col">Method</th></tr></thead>
+    <tbody>{% for r in page.items %}
+      <tr class="{{ 'row-down' if not r.reachable }}">
+        <td class="small text-nowrap">{{ r.checked_at|dt }}</td>
+        <td><a class="text-decoration-none" href="{{ url_for('devices.detail', device_id=r.device_id) }}">{{ r.device.device_name }}</a> {{ sim_badge(r.device.is_simulated) }}</td>
+        <td>{% if r.reachable %}<span class="text-up fw-semibold">Reachable</span>{% else %}<span class="text-down fw-semibold">Failed</span><div class="small text-muted">{{ r.error_message }}</div>{% endif %}</td>
+        <td class="num">{{ r.latency_ms|num(2, ' ms') }}</td>
+        <td class="num">{{ r.packet_loss_percent|num(0, '%') }}</td>
+        <td class="num">{{ r.uptime_percent|num(1, '%') }}</td>
+        <td class="num small">{{ r.cpu_percent|num(0, '%') }} / {{ r.memory_percent|num(0, '%') }}</td>
+        <td>{{ method_badge(r.method) }}</td></tr>
+    {% endfor %}</tbody></table></div>
+  {{ pagination(page, 'history.index', args, 'results') }}
+  {% else %}
+  <div class="empty"><i class="bi bi-clock-history" aria-hidden="true"></i><h3>No results in this period</h3><p>Choose a wider date range or another device.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

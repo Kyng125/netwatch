@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import sev, alert_status, sim_badge, method_badge %}
+{% block title %}Alert #{{ a.alert_id }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a href="{{ url_for('alerts.index') }}" class="small text-decoration-none"><i class="bi bi-arrow-left" aria-hidden="true"></i> Alerts</a>
+    <h1 class="mt-1 d-flex flex-wrap align-items-center gap-2">Alert #{{ a.alert_id }} {{ sev(a.severity) }} {{ alert_status(a.status) }}</h1>
+    <p>{{ a.message }}</p>
+  </div>
+</div>
+{% if a.device.is_simulated %}<div class="sim-banner mb-3"><i class="bi bi-cpu" aria-hidden="true"></i> Raised from <b>simulated</b> demonstration data — not a real network event.</div>{% endif %}
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card mb-3"><div class="card-header"><h2>Details</h2></div><div class="card-body"><dl class="kv">
+      <dt>Device</dt><dd><a href="{{ url_for('devices.detail', device_id=a.device_id) }}">{{ a.device.device_name }}</a> <span class="mono small">({{ a.device.ip_address }})</span> {{ sim_badge(a.device.is_simulated) }}</dd>
+      <dt>Type</dt><dd>{{ 'Device unreachable' if a.alert_type == 'device_down' else 'Threshold breach' }}</dd>
+      {% if a.threshold %}<dt>Rule</dt><dd class="mono">{{ a.threshold.describe() }}</dd>{% elif a.metric_name %}<dt>Metric</dt><dd>{{ METRIC_LABELS.get(a.metric_name, a.metric_name) }} <span class="text-muted">(rule since removed)</span></dd>{% endif %}
+      <dt>Opened</dt><dd>{{ a.opened_at|dt }} <span class="text-muted">({{ a.opened_at|ago }})</span></dd>
+      <dt>Acknowledged</dt><dd>{% if a.acknowledged_at %}{{ a.acknowledged_at|dt }}{% if a.acknowledger %} by {{ a.acknowledger.username }}{% endif %}{% else %}—{% endif %}</dd>
+      <dt>Resolved</dt><dd>{% if a.resolved_at %}{{ a.resolved_at|dt }}{% if a.resolver %} by {{ a.resolver.username }}{% else %} automatically{% endif %}{% else %}—{% endif %}</dd>
+      {% if a.resolution_note %}<dt>Note</dt><dd>{{ a.resolution_note }}</dd>{% endif %}
+      <dt>Email</dt><dd>{{ {'sent':'Sent','failed':'Delivery failed — see the application log','not_configured':'SMTP not configured — shown in-app only','disabled':'Email notifications switched off','no_recipients':'No recipients configured'}.get(a.email_status, a.email_status) }}{% if a.notification_count %} · {{ a.notification_count }} notification{{ 's' if a.notification_count != 1 }}{% endif %}{% if a.last_notified_at %} · last {{ a.last_notified_at|dt }}{% endif %}</dd>
+    </dl></div></div>
+    {% if a.result %}
+    <div class="card"><div class="card-header"><h2>Triggering measurement</h2><span class="card-sub">Result #{{ a.result.result_id }}</span></div><div class="card-body"><dl class="kv">
+      <dt>Checked</dt><dd>{{ a.result.checked_at|dt }}</dd>
+      <dt>Reachable</dt><dd>{{ 'Yes' if a.result.reachable else 'No' }}</dd>
+      <dt>Latency</dt><dd class="num">{{ a.result.latency_ms|num(2, ' ms') }}</dd>
+      <dt>Packet loss</dt><dd class="num">{{ a.result.packet_loss_percent|num(0, '%') }}</dd>
+      <dt>Method</dt><dd>{{ method_badge(a.result.method) }}</dd>
+      {% if a.result.error_message %}<dt>Error</dt><dd>{{ a.result.error_message }}</dd>{% endif %}
+    </dl></div></div>
+    {% endif %}
+  </div>
+  <div class="col-lg-5">
+    <div class="card"><div class="card-header"><h2>Handle this alert</h2></div><div class="card-body">
+      {% if a.status == 'open' %}
+      <form method="post" action="{{ url_for('alerts.acknowledge', alert_id=a.alert_id) }}" class="mb-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="form-label" for="ack-note">Note (optional)</label>
+        <input class="form-control mb-2" id="ack-note" name="note" maxlength="255" placeholder="e.g. Investigating with ISP">
+        <button class="btn btn-warning w-100" type="submit"><i class="bi bi-check2" aria-hidden="true"></i> Acknowledge</button>
+        <div class="form-text">Shows the team someone is working on it and pauses reminder emails.</div>
+      </form>
+      {% endif %}
+      {% if a.status != 'resolved' and current_user.is_admin %}
+      <form method="post" action="{{ url_for('alerts.resolve', alert_id=a.alert_id) }}" data-confirm="Close this alert now? If the condition is still present, a new alert will be raised on the next check." data-confirm-title="Close alert">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="form-label" for="close-note">Resolution note (optional)</label>
+        <input class="form-control mb-2" id="close-note" name="note" maxlength="255" placeholder="e.g. Replaced faulty patch cable">
+        <button class="btn btn-outline-success w-100" type="submit"><i class="bi bi-x-circle" aria-hidden="true"></i> Close alert</button>
+      </form>
+      {% elif a.status == 'resolved' %}
+      <p class="text-muted mb-0"><i class="bi bi-check-circle text-up" aria-hidden="true"></i> This alert is closed. No action needed.</p>
+      {% elif not current_user.is_admin %}
+      <p class="text-muted small mb-0">Only administrators can close alerts. Alerts also close automatically when the condition clears.</p>
+      {% endif %}
+    </div></div>
+  </div>
+</div>
+{% endblock %}

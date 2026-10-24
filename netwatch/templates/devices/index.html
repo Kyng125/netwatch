@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import status_pill, sim_badge, sort_th, pagination, method_badge, post_button %}
+{% block title %}Devices{% endblock %}
+{% block content %}
+{% set args = {'q': q, 'type': dtype, 'status': status, 'source': source, 'sort': sort, 'order': order, 'per_page': page.per_page} %}
+<div class="page-head">
+  <div><h1>Devices</h1><p>Routers, switches, servers, access points and other IP devices registered for monitoring.</p></div>
+  {% if current_user.is_admin %}<a href="{{ url_for('devices.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg" aria-hidden="true"></i> Register device</a>{% endif %}
+</div>
+
+<div class="card">
+  <form class="filter-bar" method="get" role="search" data-autosubmit>
+    <div class="grow"><label class="form-label" for="f-q">Search</label>
+      <div class="input-group input-group-sm"><span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+        <input class="form-control" id="f-q" name="q" value="{{ q }}" placeholder="Name, IP or location" maxlength="100"></div></div>
+    <div><label class="form-label" for="f-type">Type</label>
+      <select class="form-select form-select-sm" id="f-type" name="type"><option value="">All types</option>
+        {% for k, v in DEVICE_TYPES.items() %}<option value="{{ k }}" {{ 'selected' if dtype == k }}>{{ v }}</option>{% endfor %}</select></div>
+    <div><label class="form-label" for="f-status">Status</label>
+      <select class="form-select form-select-sm" id="f-status" name="status"><option value="">Any status</option>
+        {% for k, v in [('up','Up'),('down','Down'),('unknown','Pending'),('disabled','Disabled')] %}<option value="{{ k }}" {{ 'selected' if status == k }}>{{ v }}</option>{% endfor %}</select></div>
+    <div><label class="form-label" for="f-src">Data source</label>
+      <select class="form-select form-select-sm" id="f-src" name="source"><option value="">Real &amp; simulated</option>
+        <option value="real" {{ 'selected' if source == 'real' }}>Real only</option><option value="simulated" {{ 'selected' if source == 'simulated' }}>Simulated only</option></select></div>
+    <input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="order" value="{{ order }}"><input type="hidden" name="page" value="1">
+    <div><button class="btn btn-sm btn-primary" type="submit">Apply</button>
+      {% if q or dtype or status or source %}<a class="btn btn-sm btn-link" href="{{ url_for('devices.index') }}">Clear</a>{% endif %}</div>
+  </form>
+
+  {% if page.items %}
+  <div class="table-responsive">
+    <table class="table">
+      <thead><tr>
+        {{ sort_th('Device', 'name', sort, order, 'devices.index', args) }}
+        {{ sort_th('Address', 'ip', sort, order, 'devices.index', args) }}
+        {{ sort_th('Type', 'type', sort, order, 'devices.index', args) }}
+        {{ sort_th('Status', 'status', sort, order, 'devices.index', args) }}
+        <th scope="col" class="text-end">Latency</th><th scope="col" class="text-end">Loss</th><th scope="col" class="text-end">Uptime 24h</th>
+        {{ sort_th('Last check', 'checked', sort, order, 'devices.index', args) }}
+        <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
+      </tr></thead>
+      <tbody>
+      {% for d in page.items %}{% set r = latest[d.device_id] %}
+        <tr class="{{ 'row-down' if d.display_status == 'down' }}">
+          <td><a class="fw-semibold text-decoration-none" href="{{ url_for('devices.detail', device_id=d.device_id) }}">{{ d.device_name }}</a> {{ sim_badge(d.is_simulated) }}
+            {% if d.location %}<div class="small text-muted">{{ d.location }}</div>{% endif %}</td>
+          <td class="mono small">{{ d.ip_address }}</td>
+          <td>{{ d.type_label }}</td>
+          <td>{{ status_pill(d.display_status) }}</td>
+          <td class="text-end num">{{ r.latency_ms|num(2, ' ms') if r else '—' }}</td>
+          <td class="text-end num">{{ r.packet_loss_percent|num(0, '%') if r else '—' }}</td>
+          <td class="text-end num">{{ r.uptime_percent|num(1, '%') if r else '—' }}</td>
+          <td class="small text-nowrap">{{ d.last_checked_at|ago }} {{ method_badge(r.method) if r }}</td>
+          <td class="actions">
+            {% if d.enabled %}{{ post_button(url_for('devices.check_now', device_id=d.device_id), '', form, icon='arrow-repeat', title='Check ' ~ d.device_name ~ ' now') }}{% endif %}
+            {% if current_user.is_admin %}
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('devices.edit', device_id=d.device_id) }}" title="Edit {{ d.device_name }}" aria-label="Edit {{ d.device_name }}"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+            {{ post_button(url_for('devices.toggle', device_id=d.device_id), '', form, icon=('pause-circle' if d.enabled else 'play-circle'), title=('Disable' if d.enabled else 'Enable') ~ ' monitoring of ' ~ d.device_name, next=request.full_path) }}
+            {{ post_button(url_for('devices.delete', device_id=d.device_id), '', form, cls='btn btn-sm btn-outline-danger', icon='trash', title='Delete ' ~ d.device_name,
+                 confirm='Delete “' ~ d.device_name ~ '”? All of its monitoring history, thresholds and alerts will be permanently removed.', confirm_title='Delete device') }}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pagination(page, 'devices.index', args, 'devices') }}
+  {% elif total == 0 %}
+  <div class="empty"><i class="bi bi-hdd-network" aria-hidden="true"></i><h3>No devices registered</h3>
+    <p>Start by registering a device such as your office router.</p>
+    {% if current_user.is_admin %}<a class="btn btn-primary btn-sm" href="{{ url_for('devices.create') }}">Register device</a>{% endif %}</div>
+  {% else %}
+  <div class="empty"><i class="bi bi-funnel" aria-hidden="true"></i><h3>No devices match these filters</h3>
+    <a href="{{ url_for('devices.index') }}">Clear filters</a></div>
+  {% endif %}
+</div>
+{% endblock %}

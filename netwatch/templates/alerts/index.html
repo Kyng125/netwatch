@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import sev, alert_status, sim_badge, sort_th, pagination, post_button %}
+{% block title %}Alerts{% endblock %}
+{% block content %}
+{% set args = {'status': status, 'severity': severity, 'device': device_id, 'q': q, 'start': start, 'end': end, 'sort': sort, 'order': order, 'per_page': page.per_page} %}
+<div class="page-head">
+  <div><h1>Alerts</h1><p>Raised when a device stops responding or a threshold is crossed. One alert per condition; it closes automatically when the condition clears.</p></div>
+</div>
+
+<ul class="nav nav-pills gap-1 mb-3" aria-label="Alert status">
+  {% for key, label, n in [('active','Active', counts.open + counts.acknowledged), ('open','Open', counts.open), ('acknowledged','Acknowledged', counts.acknowledged), ('resolved','Resolved', counts.resolved), ('all','All', counts.open + counts.acknowledged + counts.resolved)] %}
+  <li class="nav-item"><a class="nav-link py-1 px-3 {{ 'active' if status == key }}" {% if status == key %}aria-current="page"{% endif %} href="{{ url_for('alerts.index', status=key, severity=severity, device=device_id or None, q=q or None) }}">{{ label }} <span class="badge {{ 'text-bg-light' if status == key else 'text-bg-secondary' }} ms-1">{{ n }}</span></a></li>
+  {% endfor %}
+</ul>
+
+<div class="card">
+  <form class="filter-bar" method="get" role="search" data-autosubmit>
+    <input type="hidden" name="status" value="{{ status }}">
+    <div class="grow"><label class="form-label" for="a-q">Search</label>
+      <input class="form-control form-control-sm" id="a-q" name="q" value="{{ q }}" placeholder="Message or device" maxlength="100"></div>
+    <div><label class="form-label" for="a-sev">Severity</label>
+      <select class="form-select form-select-sm" id="a-sev" name="severity"><option value="">Any</option>
+        <option value="critical" {{ 'selected' if severity == 'critical' }}>Critical</option><option value="warning" {{ 'selected' if severity == 'warning' }}>Warning</option></select></div>
+    <div><label class="form-label" for="a-dev">Device</label>
+      <select class="form-select form-select-sm" id="a-dev" name="device"><option value="0">All devices</option>
+        {% for d in devices %}<option value="{{ d.device_id }}" {{ 'selected' if device_id == d.device_id }}>{{ d.device_name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label" for="a-start">From</label><input type="date" class="form-control form-control-sm" id="a-start" name="start" value="{{ start }}"></div>
+    <div><label class="form-label" for="a-end">To</label><input type="date" class="form-control form-control-sm" id="a-end" name="end" value="{{ end }}"></div>
+    <input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="order" value="{{ order }}"><input type="hidden" name="page" value="1">
+    <div><button class="btn btn-sm btn-primary" type="submit">Apply</button>
+      {% if q or severity or device_id or start or end %}<a class="btn btn-sm btn-link" href="{{ url_for('alerts.index', status=status) }}">Clear</a>{% endif %}</div>
+  </form>
+  {% if page.items %}
+  <div class="table-responsive"><table class="table">
+    <thead><tr>
+      {{ sort_th('Severity', 'severity', sort, order, 'alerts.index', args) }}
+      {{ sort_th('Device', 'device', sort, order, 'alerts.index', args) }}
+      <th scope="col">Detail</th>
+      {{ sort_th('Status', 'status', sort, order, 'alerts.index', args) }}
+      {{ sort_th('Opened', 'opened', sort, order, 'alerts.index', args) }}
+      <th scope="col">Email</th>
+      <th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+    <tbody>{% for a in page.items %}
+      <tr>
+        <td>{{ sev(a.severity) }}</td>
+        <td><a class="fw-semibold text-decoration-none" href="{{ url_for('devices.detail', device_id=a.device_id) }}">{{ a.device.device_name }}</a> {{ sim_badge(a.device.is_simulated) }}</td>
+        <td><a href="{{ url_for('alerts.detail', alert_id=a.alert_id) }}" class="text-decoration-none text-reset">{{ a.message }}</a>
+          {% if a.resolved_at %}<div class="small text-muted">Resolved {{ a.resolved_at|dt }}{% if a.resolution_note %} — {{ a.resolution_note }}{% endif %}</div>{% endif %}</td>
+        <td>{{ alert_status(a.status) }}</td>
+        <td class="small text-nowrap">{{ a.opened_at|dt('%d %b %H:%M') }}<div class="text-muted">{{ a.opened_at|ago }}</div></td>
+        <td class="small text-muted text-nowrap">{{ {'sent':'Sent','failed':'Failed','not_configured':'SMTP not set','disabled':'Off','no_recipients':'No recipients'}.get(a.email_status, a.email_status) }}{% if a.notification_count > 1 %} ×{{ a.notification_count }}{% endif %}</td>
+        <td class="actions">
+          {% if a.status == 'open' %}{{ post_button(url_for('alerts.acknowledge', alert_id=a.alert_id), 'Acknowledge', form, icon='check2', next=request.full_path) }}{% endif %}
+          {% if a.status != 'resolved' and current_user.is_admin %}{{ post_button(url_for('alerts.resolve', alert_id=a.alert_id), 'Close', form, icon='x-circle', next=request.full_path,
+              confirm='Close this alert now? If the condition is still present, a new alert will be raised on the next check.', confirm_title='Close alert') }}{% endif %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('alerts.detail', alert_id=a.alert_id) }}" aria-label="View alert #{{ a.alert_id }}"><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+        </td>
+      </tr>
+    {% endfor %}</tbody></table></div>
+  {{ pagination(page, 'alerts.index', args, 'alerts') }}
+  {% else %}
+  <div class="empty"><i class="bi bi-{{ 'check-circle' if status in ('active', 'open') else 'inbox' }}" aria-hidden="true"></i>
+    <h3>{{ 'No active alerts' if status in ('active','open') and not (q or severity or device_id) else 'No alerts match these filters' }}</h3>
+    <p>{{ 'Every monitored device is reachable and within its thresholds.' if status in ('active','open') and not (q or severity or device_id) else 'Try widening the filters.' }}</p></div>
+  {% endif %}
+</div>
+{% endblock %}

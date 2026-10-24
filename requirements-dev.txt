@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest>=8.0
+pyyaml>=6.0                # checks render.yaml in tests/test_render_blueprint.py
+pytest-playwright>=0.5     # browser (UI) tests; then run:  python -m playwright install chromium

@@ -1,0 +1,18 @@
+# Netwatch runtime dependencies
+Flask>=3.0,<4
+Flask-SQLAlchemy>=3.1,<4
+SQLAlchemy>=2.0,<3
+Flask-Login>=0.6.3,<1
+Flask-WTF>=1.2,<2
+WTForms>=3.1,<4
+email-validator>=2.1,<3
+APScheduler>=3.10,<4
+python-dotenv>=1.0,<2
+reportlab>=4.0,<6
+pysnmp>=7.1,<8          # optional SNMP collection
+cryptography>=42        # encrypts the stored SNMP community string
+tzdata>=2024.1          # time-zone data (needed on Windows)
+gunicorn>=22.0; sys_platform != "win32"   # production server for the cloud host
+# Database drivers — install the one you use:
+#   PostgreSQL:  pip install "psycopg[binary]>=3.1"
+#   MySQL 8:     pip install "PyMySQL>=1.1"

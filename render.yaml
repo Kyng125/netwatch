@@ -1,0 +1,44 @@
+# Render Blueprint for Netwatch — see docs/DEPLOY_RENDER.md for the step-by-step guide.
+#
+# Creates one free Python web service and one free PostgreSQL database. On every start the service
+# creates the tables and loads the demonstration data ONLY if the database is still empty:
+#   * REAL public targets (Google/Cloudflare/Quad9 DNS, GitHub, Wikipedia, example.com)
+#   * clearly labelled SIMULATED devices
+# You are asked for ADMIN_PASSWORD and VIEWER_PASSWORD when you create the Blueprint; they are never
+# stored in this file or in Git.
+databases:
+  - name: netwatch-db
+    plan: free
+    databaseName: netwatch
+    user: netwatch
+    region: frankfurt          # closest listed region to Lagos; must match the web service
+
+services:
+  - type: web
+    name: netwatch
+    runtime: python            # Python version comes from .python-version (3.13)
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements-cloud.txt
+    startCommand: python manage.py init-db && python manage.py seed-public --if-empty && gunicorn "app:app" --workers 1 --threads 4 --timeout 60 --bind 0.0.0.0:$PORT
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: netwatch-db
+          property: connectionString
+      - key: SECRET_KEY            # random value generated once by Render; also protects stored SNMP strings
+        generateValue: true
+      - key: ADMIN_PASSWORD        # you type this in the Render dashboard when creating the Blueprint
+        sync: false
+      - key: VIEWER_PASSWORD       # likewise (read-only demo account)
+        sync: false
+      - key: SESSION_COOKIE_SECURE # Render serves the site over HTTPS
+        value: "true"
+      - key: MONITOR_METHOD        # cloud hosts cannot send raw ICMP, so use TCP-connect probes
+        value: tcp
+      - key: TCP_PROBE_PORTS       # try HTTPS first (DNS resolvers answer on 443, not 80)
+        value: "443,80"
+      - key: DISPLAY_TIMEZONE
+        value: Africa/Lagos

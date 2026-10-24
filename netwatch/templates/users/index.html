@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import pagination, post_button %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>User accounts</h1><p>Administrators have full control. Viewers can see everything and acknowledge alerts, but cannot change configuration.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('users.create') }}"><i class="bi bi-person-plus" aria-hidden="true"></i> New user</a>
+</div>
+<div class="card">
+  <form class="filter-bar" method="get" role="search">
+    <div class="grow"><label class="form-label" for="u-q">Search</label><input class="form-control form-control-sm" id="u-q" name="q" value="{{ q }}" placeholder="Username or email"></div>
+    <div><button class="btn btn-sm btn-primary" type="submit">Search</button></div>
+  </form>
+  {% if page.items %}
+  <div class="table-responsive"><table class="table">
+    <thead><tr><th scope="col">Username</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Alert emails</th><th scope="col">Last sign-in</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+    <tbody>{% for u in page.items %}
+      <tr><td class="fw-semibold">{{ u.username }}{% if u.user_id == current_user.user_id %} <span class="badge text-bg-light">you</span>{% endif %}</td>
+        <td>{{ u.email }}</td>
+        <td><span class="badge {{ 'text-bg-primary' if u.role == 'admin' else 'text-bg-secondary' }}">{{ 'Administrator' if u.role == 'admin' else 'Viewer' }}</span></td>
+        <td>{% if not u.is_active_account %}<span class="text-muted">Deactivated</span>{% elif u.locked_until and u.locked_until > now_utc %}<span class="text-warn">Locked</span>{% else %}<span class="text-up">Active</span>{% endif %}</td>
+        <td>{{ 'Yes' if u.receive_alert_emails else 'No' }}</td>
+        <td class="small">{{ u.last_login_at|ago }}</td>
+        <td class="actions"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('users.edit', user_id=u.user_id) }}" aria-label="Edit {{ u.username }}"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+          {% if u.user_id != current_user.user_id %}{{ post_button(url_for('users.delete', user_id=u.user_id), '', form, cls='btn btn-sm btn-outline-danger', icon='trash', title='Delete ' ~ u.username,
+              confirm='Delete the account “' ~ u.username ~ '”? Their past actions stay in the audit log.', confirm_title='Delete user') }}{% endif %}</td></tr>
+    {% endfor %}</tbody></table></div>
+  {{ pagination(page, 'users.index', {'q': q}, 'users') }}
+  {% else %}<div class="empty"><i class="bi bi-people" aria-hidden="true"></i><h3>No users match</h3></div>{% endif %}
+</div>
+{% endblock %}

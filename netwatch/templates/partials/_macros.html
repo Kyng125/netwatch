@@ -1,0 +1,79 @@
+{% macro status_pill(status) -%}
+{%- set labels = {'up': 'Up', 'down': 'Down', 'unknown': 'Pending', 'disabled': 'Disabled'} -%}
+<span class="status-pill status-{{ status }}">{{ labels.get(status, status|title) }}</span>
+{%- endmacro %}
+
+{% macro sim_badge(is_sim) -%}
+{% if is_sim %}<span class="sim-badge" title="Simulated demonstration device — values are synthetic, not real network measurements"><i class="bi bi-cpu" aria-hidden="true"></i>Simulated</span>{% endif %}
+{%- endmacro %}
+
+{% macro sev(s) -%}
+<span class="sev sev-{{ s }}">{% if s == 'critical' %}<i class="bi bi-exclamation-octagon-fill" aria-hidden="true"></i>{% elif s == 'warning' %}<i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>{% endif %}{{ s }}</span>
+{%- endmacro %}
+
+{% macro alert_status(s) -%}
+<span class="astatus astatus-{{ s }}">{{ {'open': 'Open', 'acknowledged': 'Acknowledged', 'resolved': 'Resolved'}[s] }}</span>
+{%- endmacro %}
+
+{% macro method_badge(m) -%}
+{% if m %}<span class="method-badge" title="{{ {'icmp': 'ICMP echo (ping)', 'tcp': 'TCP-connect probe (ICMP unavailable on this host)', 'simulated': 'Synthetic value from demonstration mode'}.get(m, m) }}">{{ m }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro sort_th(label, key, sort, order, endpoint, args) -%}
+{%- set active = sort == key -%}
+{%- set new_order = 'asc' if (active and order == 'desc') else ('desc' if active else 'asc') -%}
+{%- set a = dict(args) -%}{%- set _ = a.update({'sort': key, 'order': new_order, 'page': 1}) -%}
+<th scope="col" {% if active %}aria-sort="{{ 'ascending' if order == 'asc' else 'descending' }}"{% endif %}>
+  <a href="{{ url_for(endpoint, **a) }}">{{ label }}{% if active %} <i class="bi bi-caret-{{ 'up' if order == 'asc' else 'down' }}-fill" aria-hidden="true"></i>{% endif %}</a>
+</th>
+{%- endmacro %}
+
+{% macro pagination(page, endpoint, args, noun='records') -%}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-2 border-top">
+  <div class="small text-muted">
+    {% if page.total %}Showing {{ (page.page - 1) * page.per_page + 1 }}–{{ [page.page * page.per_page, page.total]|min }} of {{ '{:,}'.format(page.total) }} {{ noun }}{% else %}No {{ noun }}{% endif %}
+  </div>
+  {% if page.pages > 1 %}
+  <nav aria-label="Pagination">
+    <ul class="pagination pagination-sm">
+      {% set a = dict(args) %}
+      <li class="page-item {{ 'disabled' if not page.has_prev }}">
+        {% set _ = a.update({'page': page.prev_num or 1}) %}<a class="page-link" href="{{ url_for(endpoint, **a) }}" aria-label="Previous page">‹</a></li>
+      {% for p in page.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+        {% if p %}{% set _ = a.update({'page': p}) %}
+          <li class="page-item {{ 'active' if p == page.page }}"><a class="page-link" href="{{ url_for(endpoint, **a) }}" {% if p == page.page %}aria-current="page"{% endif %}>{{ p }}</a></li>
+        {% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+      {% endfor %}
+      <li class="page-item {{ 'disabled' if not page.has_next }}">
+        {% set _ = a.update({'page': page.next_num or page.pages}) %}<a class="page-link" href="{{ url_for(endpoint, **a) }}" aria-label="Next page">›</a></li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro field(f, help=None, cls='', placeholder=None) -%}
+<div class="mb-3 {{ cls }}">
+  {% if f.type == 'BooleanField' %}
+    <div class="form-check form-switch">
+      {{ f(class_='form-check-input' + (' is-invalid' if f.errors else ''), role='switch') }}
+      {{ f.label(class_='form-check-label') }}
+    </div>
+  {% else %}
+    {{ f.label(class_='form-label') }}
+    {% set kw = {'class_': ('form-select' if f.type == 'SelectField' else 'form-control') + (' is-invalid' if f.errors else '')} %}
+    {% if placeholder %}{% set _ = kw.update({'placeholder': placeholder}) %}{% endif %}
+    {% if help %}{% set _ = kw.update({'aria-describedby': f.id ~ '-help'}) %}{% endif %}
+    {{ f(**kw) }}
+  {% endif %}
+  {% for e in f.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+  {% if help %}<div class="form-text" id="{{ f.id }}-help">{{ help }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro post_button(action, label, form, cls='btn btn-sm btn-outline-secondary', icon=None, confirm=None, confirm_title=None, next=None, title=None) -%}
+<form method="post" action="{{ action }}" class="d-inline" {% if confirm %}data-confirm="{{ confirm }}" data-confirm-title="{{ confirm_title or label }}"{% endif %}>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+  <button type="submit" class="{{ cls }}" {% if title %}title="{{ title }}" aria-label="{{ title }}"{% endif %}>{% if icon %}<i class="bi bi-{{ icon }}" aria-hidden="true"></i>{% endif %}{% if label %}{{ ' ' if icon }}{{ label }}{% endif %}</button>
+</form>
+{%- endmacro %}

@@ -1,0 +1,10 @@
+{% if current_user and current_user.is_authenticated %}{% extends "base.html" %}{% else %}{% extends "auth/_layout.html" %}{% endif %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="text-center py-5" style="max-width:520px;margin:0 auto">
+  <div class="err-code">{{ code }}</div>
+  <h1 class="h3 fw-bold mt-3">{{ title }}</h1>
+  <p class="text-muted">{{ message }}</p>
+  <a class="btn btn-primary" href="{{ url_for('dashboard.index') }}">Go to the dashboard</a>
+</div>
+{% endblock %}

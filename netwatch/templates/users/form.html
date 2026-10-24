@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import field %}
+{% block title %}{{ 'Edit ' ~ user.username if user else 'New user' }}{% endblock %}
+{% block content %}
+<div class="page-head"><div>
+  <a href="{{ url_for('users.index') }}" class="small text-decoration-none"><i class="bi bi-arrow-left" aria-hidden="true"></i> Users</a>
+  <h1 class="mt-1">{{ 'Edit account' if user else 'Create account' }}</h1></div></div>
+<form method="post" class="card" style="max-width:720px" novalidate>
+  {{ form.csrf_token }}
+  <div class="card-body">
+    <div class="row">{{ field(form.username, cls='col-md-6') }}{{ field(form.email, cls='col-md-6') }}</div>
+    {{ field(form.role) }}
+    {{ field(form.password, help=('Leave blank to keep the current password. Setting one also unlocks the account.' if user else 'At least 8 characters with letters and a number.')) }}
+    {{ field(form.is_active_account, help='Deactivated users cannot sign in.') }}
+    {{ field(form.receive_alert_emails) }}
+  </div>
+  <div class="card-footer bg-transparent d-flex justify-content-end gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('users.index') }}">Cancel</a>
+    <button class="btn btn-primary" type="submit">{{ 'Save changes' if user else 'Create account' }}</button>
+  </div>
+</form>
+{% endblock %}

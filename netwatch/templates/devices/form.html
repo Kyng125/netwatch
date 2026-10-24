@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import field, sim_badge %}
+{% block title %}{{ 'Edit ' ~ device.device_name if device else 'Register device' }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a href="{{ url_for('devices.detail', device_id=device.device_id) if device else url_for('devices.index') }}" class="small text-decoration-none"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</a>
+    <h1 class="mt-1">{{ 'Edit device' if device else 'Register a device' }} {{ sim_badge(device and device.is_simulated) }}</h1>
+    <p>{{ 'Change how this device is identified and polled.' if device else 'Add a network device for Netwatch to check on a schedule. Only register equipment your organisation is authorised to monitor.' }}</p>
+  </div>
+</div>
+{% if form.errors %}<div class="alert alert-danger" role="alert"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> Please correct the highlighted fields.</div>{% endif %}
+<form method="post" novalidate>
+  {{ form.csrf_token }}
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card"><div class="card-header"><h2>Identity</h2></div><div class="card-body">
+        {{ field(form.device_name, help='A unique, recognisable name, e.g. “Head-office core switch”.') }}
+        <div class="row">
+          {{ field(form.ip_address, cls='col-md-7', help='IPv4, IPv6 or hostname reachable from the Netwatch server.', placeholder='192.168.1.1') }}
+          {{ field(form.device_type, cls='col-md-5') }}
+        </div>
+        {{ field(form.location, placeholder='e.g. Server room, 2nd floor') }}
+        {{ field(form.description) }}
+      </div></div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card mb-3"><div class="card-header"><h2>Monitoring</h2></div><div class="card-body">
+        {{ field(form.polling_interval, help='How often the device is checked: 10 s to 24 h. 60 s suits most small networks.') }}
+        {{ field(form.enabled, help='Disabled devices keep their history but are not checked.') }}
+        {% if not device %}{{ field(form.add_default_thresholds, help='Latency > 150 ms (warning) / > 500 ms (critical); packet loss > 25 % (warning) / ≥ 75 % (critical). You can edit these later.') }}{% endif %}
+      </div></div>
+      <div class="card"><div class="card-header"><h2>SNMP <span class="text-muted fw-normal small">optional</span></h2></div><div class="card-body">
+        {{ field(form.snmp_enabled, help='For devices running an SNMP v2c agent. Adds CPU and memory readings.') }}
+        {{ field(form.snmp_community, help=('Leave blank to keep the stored community string.' if device and device.snmp_community else 'Treat this like a password; it is never shown again.')) }}
+      </div></div>
+    </div>
+  </div>
+  <div class="d-flex gap-2 justify-content-end mt-3">
+    <a class="btn btn-outline-secondary" href="{{ url_for('devices.detail', device_id=device.device_id) if device else url_for('devices.index') }}">Cancel</a>
+    <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg" aria-hidden="true"></i> {{ 'Save changes' if device else 'Register device' }}</button>
+  </div>
+</form>
+{% endblock %}

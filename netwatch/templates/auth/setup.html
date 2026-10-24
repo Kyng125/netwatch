@@ -1,0 +1,16 @@
+{% extends "auth/_layout.html" %}
+{% from "partials/_macros.html" import field %}
+{% block title %}First-time setup{% endblock %}
+{% block content %}
+<span class="badge text-bg-primary mb-2">First-time setup</span>
+<h2 class="h3 fw-bold mb-1">Create the administrator</h2>
+<p class="text-muted mb-4">No accounts exist yet. This page disappears once the first administrator is created.</p>
+<form method="post" novalidate>
+  {{ form.csrf_token }}
+  {{ field(form.username, help='Letters, numbers, dot, dash or underscore.') }}
+  {{ field(form.email, help='Alert emails are sent here.') }}
+  {{ field(form.password, help='At least 8 characters with letters and a number.') }}
+  {{ field(form.confirm) }}
+  <button class="btn btn-primary w-100 py-2" type="submit">Create account and continue</button>
+</form>
+{% endblock %}

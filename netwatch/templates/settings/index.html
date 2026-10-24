@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Settings</h1><p>Monitoring and alerting parameters (stored in the database) and the environment-level configuration (read from <code>.env</code>; secrets are never shown).</p></div></div>
+<div class="row g-3">
+  <div class="col-xl-7">
+    <form method="post" class="card" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="card-header"><h2>Monitoring &amp; alerting</h2></div>
+      <div class="card-body">
+        {% for key, d in defs.items() %}
+        {% set kind, default, label, help = d[0], d[1], d[2], d[3] %}
+        {% set v = form_values.get(key) if form_values else values[key] %}
+        <div class="mb-3">
+          {% if kind.__name__ == 'bool' %}
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="s-{{ key }}" name="{{ key }}" value="y" {{ 'checked' if (v if not form_values else form_values.get(key)) }} aria-describedby="h-{{ key }}">
+            <label class="form-check-label" for="s-{{ key }}">{{ label }}</label>
+          </div>
+          {% else %}
+          <label class="form-label" for="s-{{ key }}">{{ label }}</label>
+          <input class="form-control {{ 'is-invalid' if errors.get(key) }}" id="s-{{ key }}" name="{{ key }}" value="{{ v }}"
+                 {% if kind.__name__ == 'int' %}type="number" min="{{ d[4] }}" max="{{ d[5] }}" step="1"{% else %}type="text" maxlength="500"{% endif %} aria-describedby="h-{{ key }}">
+          {% endif %}
+          {% if errors.get(key) %}<div class="invalid-feedback d-block">{{ errors[key] }}</div>{% endif %}
+          <div class="form-text" id="h-{{ key }}">{{ help }} <span class="text-muted">(default: {{ default if default != '' else 'none' }})</span></div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="card-footer bg-transparent d-flex justify-content-end"><button class="btn btn-primary" type="submit">Save settings</button></div>
+    </form>
+  </div>
+  <div class="col-xl-5">
+    <div class="card mb-3"><div class="card-header"><h2>Email (SMTP)</h2>
+      <span class="status-pill {{ 'status-up' if env.smtp_configured else 'status-unknown' }}">{{ 'Configured' if env.smtp_configured else 'Not configured' }}</span></div>
+      <div class="card-body">
+        <dl class="kv mb-3">
+          <dt>Server</dt><dd class="mono">{{ env.mail_server or '—' }}{% if env.mail_server %}:{{ env.mail_port }}{% endif %}</dd>
+          <dt>Security</dt><dd>{{ env.mail_tls }}</dd>
+          <dt>From</dt><dd>{{ env.mail_from or '—' }}</dd>
+          <dt>Recipients</dt><dd>{{ env.recipients|join(', ') if env.recipients else 'None — enable “Receive alert emails” on a user or add addresses.' }}</dd>
+        </dl>
+        <form method="post" action="{{ url_for('settings.test_email') }}" data-busy="Sending…">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-envelope-check" aria-hidden="true"></i> Send a test email to {{ current_user.email }}</button>
+        </form>
+        {% if not env.smtp_configured %}<p class="small text-muted mt-2 mb-0">Without SMTP, alerts are still created and shown in the app. See the README for Gmail app-password setup.</p>{% endif %}
+      </div></div>
+    <div class="card"><div class="card-header"><h2>Collector &amp; system</h2>
+      <span class="status-pill {{ 'status-up' if env.scheduler.running else 'status-down' }}">{{ 'Scheduler running' if env.scheduler.running else 'Scheduler stopped' }}</span></div>
+      <div class="card-body"><dl class="kv">
+        <dt>Probe method</dt><dd>{{ env.monitor_method|upper }}{% if env.monitor_method == 'auto' %} — ICMP, falling back to TCP if ICMP is unavailable{% endif %}</dd>
+        <dt>ICMP (ping)</dt><dd>{% if env.ping.ping_binary and not env.ping.icmp_fallback_active %}<span class="text-up">Available</span> <span class="mono small">{{ env.ping.ping_binary }}</span>{% elif env.ping.icmp_fallback_active %}<span class="text-warn">Unavailable on this host — using TCP-connect probes (ports {{ env.tcp_ports|join(', ') }})</span>{% else %}<span class="text-warn">ping not found — TCP-connect probes are used</span>{% endif %}</dd>
+        <dt>Per check</dt><dd>{{ env.ping_count }} probes, {{ env.ping_timeout }} s timeout</dd>
+        <dt>Last scheduler tick</dt><dd>{{ env.scheduler.last_tick|dt if env.scheduler.last_tick else '—' }}{% if env.scheduler.last_tick %} ({{ env.scheduler.last_tick_checked }} device{{ 's' if env.scheduler.last_tick_checked != 1 }} due){% endif %}</dd>
+        <dt>Polling jobs</dt><dd>{{ env.scheduler.poll_jobs }} <span class="text-muted small">(must be 1 — no duplicate monitoring)</span></dd>
+        <dt>Database</dt><dd>{{ env.db_engine }}</dd>
+        <dt>Time zone</dt><dd>{{ env.tz }}</dd>
+        <dt>Platform</dt><dd>{{ env.platform }} · Python {{ env.python }}</dd>
+      </dl></div></div>
+  </div>
+</div>
+{% endblock %}

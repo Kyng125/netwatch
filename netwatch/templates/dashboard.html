@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import status_pill, sim_badge, sev, alert_status, method_badge %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Network overview</h1>
+    <p>Live status of every registered device, built from the latest stored monitoring results. Refreshes automatically every 15 seconds.</p>
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    <span class="small text-muted" id="dash-updated" aria-live="polite">Updated just now</span>
+    <button class="btn btn-sm btn-outline-secondary" id="dash-refresh" type="button"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button>
+    {% if current_user.is_admin %}<a class="btn btn-sm btn-primary" href="{{ url_for('devices.create') }}"><i class="bi bi-plus-lg" aria-hidden="true"></i> Add device</a>{% endif %}
+  </div>
+</div>
+<div class="loading-bar mb-2" id="dash-loading"></div>
+
+{% if o.simulated %}
+<div class="sim-banner mb-3 d-flex gap-2 align-items-start"><i class="bi bi-info-circle mt-1" aria-hidden="true"></i>
+  <div><b>Demonstration mode is active for {{ o.simulated }} device{{ 's' if o.simulated != 1 }}.</b> Devices tagged <span class="sim-badge">Simulated</span> produce synthetic values so the full workflow can be shown without a lab network. All other devices are measured for real by the collector.</div>
+</div>
+{% endif %}
+
+<div class="row g-3 mb-3" id="stat-cards">
+  <div class="col-6 col-xl-3"><div class="card stat"><span class="accent" style="background:var(--nw-accent)"></span>
+    <span class="label"><i class="bi bi-hdd-network" aria-hidden="true"></i>Monitored devices</span>
+    <span class="value" data-k="enabled">{{ o.total - o.disabled }}<small>/ {{ o.total }}</small></span>
+    <span class="foot"><span data-k="disabled">{{ o.disabled }}</span> disabled</span></div></div>
+  <div class="col-6 col-xl-3"><div class="card stat"><span class="accent" style="background:var(--nw-up)"></span>
+    <span class="label"><i class="bi bi-arrow-up-circle" aria-hidden="true"></i>Up / Down</span>
+    <span class="value"><span class="text-up" data-k="up">{{ o.up }}</span><small>/</small> <span class="{{ 'text-down' if o.down else '' }}" data-k="down">{{ o.down }}</span></span>
+    <span class="foot"><span data-k="unknown">{{ o.unknown }}</span> awaiting first check</span></div></div>
+  <div class="col-6 col-xl-3"><div class="card stat"><span class="accent" style="background:#18a0c9"></span>
+    <span class="label"><i class="bi bi-speedometer2" aria-hidden="true"></i>Uptime (24 h)</span>
+    <span class="value" data-k="uptime_24h">{{ o.uptime_24h|num(2, '%') }}</span>
+    <span class="foot">avg latency (1 h) <b class="num" data-k="avg_latency_1h">{{ o.avg_latency_1h|num(1, ' ms') }}</b></span></div></div>
+  <div class="col-6 col-xl-3"><div class="card stat"><span class="accent" style="background:var(--nw-down)"></span>
+    <span class="label"><i class="bi bi-bell" aria-hidden="true"></i>Active alerts</span>
+    <span class="value"><span data-k="alerts_active">{{ o.alerts_open + o.alerts_ack }}</span></span>
+    <span class="foot"><span class="text-down" data-k="alerts_critical">{{ o.alerts_critical }}</span> critical · <span class="text-warn" data-k="alerts_warning">{{ o.alerts_warning }}</span> warning · <span data-k="alerts_ack">{{ o.alerts_ack }}</span> acknowledged</span></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-xl-8">
+    <div class="card mb-3">
+      <div class="card-header"><h2>Device status</h2><a class="small" href="{{ url_for('devices.index') }}">Manage devices →</a></div>
+      <div class="card-body">
+        {% if devices %}
+        <div class="dev-grid" id="dev-grid">
+          {% for d in devices %}{% set r = latest[d.device_id] %}
+          <a class="dev-tile is-{{ d.display_status }}" href="{{ url_for('devices.detail', device_id=d.device_id) }}">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div><div class="name">{{ d.device_name }}</div><div class="meta mono">{{ d.ip_address }}</div></div>
+              {{ status_pill(d.display_status) }}
+            </div>
+            <div class="meta mt-1">{{ d.type_label }} {{ sim_badge(d.is_simulated) }}</div>
+            <div class="metrics">
+              <div>Latency<b>{{ r.latency_ms|num(1) if r else '—' }}</b></div>
+              <div>Loss<b>{{ (r.packet_loss_percent|num(0, '%')) if r else '—' }}</b></div>
+              <div>Uptime<b>{{ (r.uptime_percent|num(1, '%')) if r else '—' }}</b></div>
+            </div>
+            <div class="meta mt-2">{{ 'Checked ' ~ (d.last_checked_at|ago) if d.last_checked_at else 'Not checked yet' }}</div>
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty"><i class="bi bi-hdd-network" aria-hidden="true"></i><h3>No devices registered yet</h3>
+          <p>Register a router, switch, server or access point to start collecting measurements.</p>
+          {% if current_user.is_admin %}<a href="{{ url_for('devices.create') }}" class="btn btn-primary btn-sm">Register first device</a>{% endif %}</div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>Latency — last 6 hours</h2><span class="card-sub">5-minute averages from stored results</span></div>
+      <div class="card-body"><div class="chart-box" id="fleet-chart-box"><canvas id="fleet-chart" aria-label="Latency per device over the last six hours" role="img"></canvas>
+        <div class="chart-empty">No measurements in the last 6 hours yet. Results appear here after the first scheduled checks.</div></div></div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="card mb-3">
+      <div class="card-header"><h2>Active alerts</h2><a class="small" href="{{ url_for('alerts.index') }}">All alerts →</a></div>
+      <ul class="feed" id="alert-feed">
+        {% for a in alerts %}
+        <li><span class="ico" style="background:{{ '#fdeaea' if a.severity == 'critical' else '#fef3e2' }};color:{{ '#c81e1e' if a.severity == 'critical' else '#b45309' }}"><i class="bi bi-{{ 'exclamation-octagon' if a.severity == 'critical' else 'exclamation-triangle' }}" aria-hidden="true"></i></span>
+          <div class="flex-grow-1 min-w-0"><a href="{{ url_for('alerts.detail', alert_id=a.alert_id) }}" class="fw-semibold text-decoration-none">{{ a.device.device_name }}</a> {{ sim_badge(a.device.is_simulated) }}
+            <div class="text-muted small">{{ a.message }}</div>
+            <div class="when">{{ a.opened_at|ago }} · {{ alert_status(a.status) }}</div></div></li>
+        {% else %}
+        <li class="justify-content-center text-muted py-4"><i class="bi bi-check-circle text-up" aria-hidden="true"></i> No active alerts — all monitored devices are within their thresholds.</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>Recent activity</h2>{% if current_user.is_admin %}<a class="small" href="{{ url_for('settings.audit_log') }}">Audit log →</a>{% endif %}</div>
+      <ul class="feed">
+        {% for e in events %}
+        <li><span class="ico" style="background:#eef2f7;color:#334155"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
+          <div><div>{{ e.details or e.action.replace('_', ' ')|capitalize }}</div>
+            <div class="when">{{ e.user.username if e.user else 'system' }} · {{ e.log_time|ago }}</div></div></li>
+        {% else %}
+        <li class="text-muted">No activity recorded yet.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+<div id="dash-config" hidden data-api="{{ url_for('api.dashboard') }}" data-device-url="{{ url_for('devices.detail', device_id=0) }}" data-alert-url="{{ url_for('alerts.detail', alert_id=0) }}"></div>
+{% endblock %}
+{% block scripts_vendor %}
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/chartjs/chartjs-adapter-date-fns.bundle.min.js') }}"></script>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/dashboard.js') }}?v={{ APP_VERSION }}"></script>{% endblock %}

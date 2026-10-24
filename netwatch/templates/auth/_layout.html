@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} · {{ APP_NAME }}</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/icons/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ APP_VERSION }}">
+</head>
+<body>
+<div class="auth-wrap">
+  <section class="auth-art" aria-hidden="true">
+    <div class="d-flex align-items-center gap-2">
+      <span class="nw-logo"><i class="bi bi-activity"></i></span><strong class="text-white fs-5">{{ APP_NAME }}</strong>
+    </div>
+    <div>
+      <h1>Know your network is healthy — before your users tell you it isn't.</h1>
+      <p>A low-cost, cloud-hosted monitor for small organisations: device availability, latency, packet loss and uptime, with history, reports and email alerts.</p>
+      <ul class="auth-points">
+        <li><i class="bi bi-check2-circle"></i>Scheduled ICMP reachability checks</li>
+        <li><i class="bi bi-check2-circle"></i>Threshold rules with controlled alerting</li>
+        <li><i class="bi bi-check2-circle"></i>Historical records and exportable reports</li>
+      </ul>
+    </div>
+    <svg class="topo" viewBox="0 0 520 300" fill="none" stroke="#2b5ea3" stroke-width="1.4">
+      <g opacity=".9"><line x1="60" y1="220" x2="180" y2="150"/><line x1="180" y1="150" x2="300" y2="190"/><line x1="180" y1="150" x2="250" y2="60"/><line x1="300" y1="190" x2="430" y2="120"/><line x1="300" y1="190" x2="380" y2="270"/><line x1="250" y1="60" x2="430" y2="120"/></g>
+      <g fill="#0b1b33" stroke="#4fb3e8" stroke-width="2"><circle cx="60" cy="220" r="9"/><circle cx="180" cy="150" r="12"/><circle cx="300" cy="190" r="10"/><circle cx="250" cy="60" r="8"/><circle cx="430" cy="120" r="11"/><circle cx="380" cy="270" r="8"/></g>
+      <circle cx="380" cy="270" r="8" fill="#e05252" stroke="none"/>
+    </svg>
+    <small class="text-secondary">Yaba College of Technology · Department of Computer Science (NCC) · HND Project</small>
+  </section>
+  <main class="auth-form" id="main">
+    <div class="auth-card">
+      {% for cat, msg in get_flashed_messages(with_categories=true) %}
+      <div class="alert alert-{{ cat }} py-2 small" role="{{ 'alert' if cat in ('danger', 'warning') else 'status' }}">{{ msg }}</div>
+      {% endfor %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+</body>
+</html>

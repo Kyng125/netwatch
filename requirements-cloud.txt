@@ -1,0 +1,4 @@
+# Used by the Render deployment (see render.yaml and docs/DEPLOY_RENDER.md):
+# the normal requirements plus the PostgreSQL driver.
+-r requirements.txt
+psycopg[binary]>=3.1,<4

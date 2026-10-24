@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import field %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Your profile</h1><p>Update your email address, alert preference and password.</p></div></div>
+<div class="row g-3">
+  <div class="col-lg-7">
+    <form method="post" class="card" novalidate>
+      {{ form.csrf_token }}
+      <div class="card-header"><h2>Account</h2><span class="card-sub">{{ current_user.username }} · {{ 'Administrator' if current_user.is_admin else 'Viewer' }}</span></div>
+      <div class="card-body">
+        {{ field(form.email) }}
+        {{ field(form.receive_alert_emails, help='Send me an email when an alert opens.') }}
+        <hr>
+        <h3 class="h6 fw-semibold mb-3">Change password <span class="text-muted fw-normal small">(leave blank to keep the current one)</span></h3>
+        {{ field(form.current_password) }}
+        <div class="row">
+          {{ field(form.new_password, cls='col-md-6', help='At least 8 characters, letters and a number.') }}
+          {{ field(form.confirm, cls='col-md-6') }}
+        </div>
+      </div>
+      <div class="card-footer bg-transparent d-flex justify-content-end"><button class="btn btn-primary" type="submit">Save changes</button></div>
+    </form>
+  </div>
+  <div class="col-lg-5">
+    <div class="card"><div class="card-header"><h2>Sign-in activity</h2></div>
+      <div class="card-body"><dl class="kv">
+        <dt>Last sign-in</dt><dd>{{ current_user.last_login_at|dt }}</dd>
+        <dt>Account created</dt><dd>{{ current_user.created_at|dt }}</dd>
+        <dt>Role</dt><dd>{{ 'Administrator — full control' if current_user.is_admin else 'Viewer — read-only, can acknowledge alerts' }}</dd>
+      </dl></div></div>
+  </div>
+</div>
+{% endblock %}
