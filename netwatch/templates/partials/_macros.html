@@ -77,3 +77,13 @@
   <button type="submit" class="{{ cls }}" {% if title %}title="{{ title }}" aria-label="{{ title }}"{% endif %}>{% if icon %}<i class="bi bi-{{ icon }}" aria-hidden="true"></i>{% endif %}{% if label %}{{ ' ' if icon }}{{ label }}{% endif %}</button>
 </form>
 {%- endmacro %}
+
+{% macro agent_state(state) -%}
+{%- set m = {'online': ('up', 'Agent online'), 'offline': ('down', 'Agent offline'), 'never': ('unknown', 'Waiting for agent'), 'disabled': ('disabled', 'Site disabled')} -%}
+{%- set cls, label = m.get(state, ('unknown', state)) -%}
+<span class="status-pill status-{{ cls }}">{{ label }}</span>
+{%- endmacro %}
+
+{% macro site_badge(site) -%}
+{% if site %}<span class="site-badge" title="Checked from the LAN by the on-site agent for {{ site.name }}"><i class="bi bi-building" aria-hidden="true"></i>{{ site.name }}</span>{% endif %}
+{%- endmacro %}

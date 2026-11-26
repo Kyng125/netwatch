@@ -49,7 +49,11 @@ def main(argv=None):
     app = create_app(start_scheduler=False)
     with app.app_context():
         if args.cmd == "init-db":
+            from netwatch import migrations
             db.create_all()
+            added = migrations.upgrade()
+            if added:
+                print(f"Schema upgraded: added {', '.join(added)}")
             print(f"Database ready: {db.engine.url.render_as_string(hide_password=True)}")
 
         elif args.cmd == "reset-db":
@@ -110,6 +114,9 @@ def main(argv=None):
         elif args.cmd == "check-all":
             from netwatch.services import monitor
             for d in Device.query.filter_by(enabled=True).order_by(Device.device_name).all():
+                if d.checked_by_agent:
+                    print(f"  {d.device_name:32} checked by the on-site agent for site '{d.site.name}'")
+                    continue
                 r = monitor.check_device(d.device_id)
                 if r is None:
                     print(f"  {d.device_name:32} skipped")

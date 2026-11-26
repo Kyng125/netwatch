@@ -26,7 +26,9 @@ def index():
             return redirect(url_for("settings.index"))
         changed = []
         for key, (kind, *_rest) in app_settings.DEFAULTS.items():
-            raw = ("true" if request.form.get(key) else "false") if kind is bool else request.form.get(key, "")
+            if kind is not bool and key not in request.form:
+                continue  # not on the submitted form (e.g. a setting added later): keep its value
+            raw =("true" if request.form.get(key) else "false") if kind is bool else request.form.get(key, "")
             if kind is str and key == "extra_alert_recipients":
                 emails = [e.strip() for e in raw.split(",") if e.strip()]
                 bad = [e for e in emails if "@" not in e or " " in e or len(e) > 120]

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import field %}
+{% block title %}{{ 'Edit ' ~ site.name if site else 'New site' }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a href="{{ url_for('sites.detail', site_id=site.site_id) if site else url_for('sites.index') }}" class="small text-decoration-none"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</a>
+    <h1 class="mt-1">{{ 'Edit site' if site else 'New site' }}</h1>
+    <p>{{ 'Rename or disable this site.' if site else 'Name the private network you want to monitor. After saving you get a secret agent key and the steps to start the agent on a computer in that network.' }}</p>
+  </div>
+</div>
+{% if form.errors %}<div class="alert alert-danger" role="alert"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> Please correct the highlighted fields.</div>{% endif %}
+<form method="post" novalidate style="max-width: 640px">
+  {{ form.csrf_token }}
+  <div class="card"><div class="card-body">
+    {{ field(form.name, help='For example “Head office LAN”, “Computer lab 2” or “Hotspot network”.') }}
+    {{ field(form.description, help='Optional: where the network is, who looks after it.') }}
+    {{ field(form.enabled, help='A disabled site rejects its agent; its devices are shown as Pending.') }}
+  </div></div>
+  <div class="d-flex gap-2 justify-content-end mt-3">
+    <a class="btn btn-outline-secondary" href="{{ url_for('sites.detail', site_id=site.site_id) if site else url_for('sites.index') }}">Cancel</a>
+    <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg" aria-hidden="true"></i> {{ 'Save changes' if site else 'Create site' }}</button>
+  </div>
+</form>
+{% endblock %}

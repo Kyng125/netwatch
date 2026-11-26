@@ -22,6 +22,8 @@
       <div class="nw-section">Monitor</div>
       <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if ep == 'dashboard.index' }}"><i class="bi bi-grid-1x2" aria-hidden="true"></i>Dashboard</a>
       <a href="{{ url_for('devices.index') }}" class="{{ 'active' if ep.startswith('devices.') }}"><i class="bi bi-hdd-network" aria-hidden="true"></i>Devices</a>
+      <a href="{{ url_for('sites.index') }}" class="{{ 'active' if ep.startswith('sites.') }}"><i class="bi bi-building" aria-hidden="true"></i>Sites &amp; agents
+        {% if nav_offline_agents %}<span class="badge rounded-pill text-bg-warning" aria-label="{{ nav_offline_agents }} agents offline">{{ nav_offline_agents }}</span>{% endif %}</a>
       <a href="{{ url_for('alerts.index') }}" class="{{ 'active' if ep.startswith('alerts.') }}"><i class="bi bi-bell" aria-hidden="true"></i>Alerts
         {% if nav_open_alerts %}<span class="badge rounded-pill text-bg-danger" aria-label="{{ nav_open_alerts }} open alerts">{{ nav_open_alerts }}</span>{% endif %}</a>
       <div class="nw-section">Analyse</div>

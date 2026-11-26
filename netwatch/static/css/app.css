@@ -228,3 +228,13 @@ td.actions { white-space: nowrap; text-align: right; }
 .uptime-bar span.ok { background: #3fb36b; }
 .uptime-bar span.part { background: #f0b443; }
 .uptime-bar span.bad { background: #e05252; }
+
+/* ---- On-site agents (Sites) ---- */
+.site-badge { display: inline-flex; align-items: center; gap: .3rem; font-size: .72rem; font-weight: 600; padding: .12rem .5rem; border-radius: 999px; color: #0f4c5c; background: #e3f2f5; border: 1px solid #b9dfe6; white-space: nowrap; }
+.key-box { background: #fffbea; border: 1px solid #f2d98a; border-radius: 9px; padding: .85rem 1rem; }
+.key-box code { display: block; font-size: .92rem; word-break: break-all; background: #fff; border: 1px solid #eadfb8; border-radius: 6px; padding: .5rem .65rem; margin: .4rem 0; user-select: all; }
+.cmd { display: block; background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: .6rem .8rem; font-size: .82rem; white-space: pre-wrap; word-break: break-all; user-select: all; }
+.steps { padding-left: 1.2rem; margin: 0; }
+.steps > li { margin-bottom: .85rem; }
+.steps > li:last-child { margin-bottom: 0; }
+.empty .btn i { font-size: inherit; display: inline; margin: 0; color: inherit; }

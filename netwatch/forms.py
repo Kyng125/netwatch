@@ -7,7 +7,7 @@ from wtforms import (BooleanField, FloatField, IntegerField, PasswordField, Sele
 from wtforms.validators import (DataRequired, Email, EqualTo, InputRequired, Length, NumberRange, Optional,
                                 ValidationError)
 
-from .models import Device, Threshold, User
+from .models import Device, Site, Threshold, User
 from .services.collector import validate_host
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,50}$")
@@ -57,10 +57,22 @@ class DeviceForm(FlaskForm):
     snmp_community = StringField("SNMP community string", validators=[Length(max=100)],
                                  filters=[strip])
     add_default_thresholds = BooleanField("Add recommended thresholds (latency, packet loss)", default=True)
+    # validate_choice=False: a client that does not send the field (older forms, scripts) keeps the
+    # device on the Netwatch server; validate_site_id below still rejects unknown site ids.
+    site_id = SelectField("Checked from", coerce=int, default=0, validate_choice=False)
 
     def __init__(self, *args, device_id=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._device_id = device_id
+        self.site_id.choices = [(0, "Netwatch server (internet / public addresses)")] + [
+            (s.site_id, f"On-site agent: {s.name}" + ("" if s.enabled else " (disabled)"))
+            for s in Site.query.order_by(Site.name).all()]
+
+    def validate_site_id(self, field):
+        if field.data is None:  # field not sent: keep the device's current collector (None = server)
+            field.data = 0
+        if field.data and field.data not in {v for v, _l in self.site_id.choices}:
+            raise ValidationError("Choose a site from the list.")
 
     def validate_ip_address(self, field):
         try:
@@ -148,6 +160,23 @@ class ProfileForm(FlaskForm):
     new_password = PasswordField("New password", validators=[Optional(), strong_password, Length(max=128)])
     confirm = PasswordField("Confirm new password",
                             validators=[EqualTo("new_password", "Passwords do not match.")])
+
+
+class SiteForm(FlaskForm):
+    name = StringField("Site name", validators=[DataRequired(), Length(min=2, max=100)], filters=[strip])
+    description = TextAreaField("Description", validators=[Optional(), Length(max=255)], filters=[strip])
+    enabled = BooleanField("Site enabled", default=True)
+
+    def __init__(self, *args, site_id=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._site_id = site_id
+
+    def validate_name(self, field):
+        q = Site.query.filter(Site.name.ilike(field.data))
+        if self._site_id:
+            q = q.filter(Site.site_id != self._site_id)
+        if q.first():
+            raise ValidationError("A site with this name already exists.")
 
 
 class ConfirmForm(FlaskForm):

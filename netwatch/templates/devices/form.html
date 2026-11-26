@@ -17,7 +17,7 @@
       <div class="card"><div class="card-header"><h2>Identity</h2></div><div class="card-body">
         {{ field(form.device_name, help='A unique, recognisable name, e.g. “Head-office core switch”.') }}
         <div class="row">
-          {{ field(form.ip_address, cls='col-md-7', help='IPv4, IPv6 or hostname reachable from the Netwatch server.', placeholder='192.168.1.1') }}
+          {{ field(form.ip_address, cls='col-md-7', help='IPv4, IPv6 or hostname. Find a router’s address with “ipconfig” (Default Gateway) on a computer in that network.', placeholder='192.168.1.1') }}
           {{ field(form.device_type, cls='col-md-5') }}
         </div>
         {{ field(form.location, placeholder='e.g. Server room, 2nd floor') }}
@@ -26,12 +26,16 @@
     </div>
     <div class="col-lg-5">
       <div class="card mb-3"><div class="card-header"><h2>Monitoring</h2></div><div class="card-body">
+        {% if device and device.is_simulated %}{% else %}
+        {{ field(form.site_id, help='Private LAN addresses (192.168.x.x, 10.x.x.x, 172.16–31.x.x) can only be reached by an on-site agent inside that network — choose its site. Public addresses can be checked by the Netwatch server.') }}
+        {% if form.site_id.choices|length == 1 %}<p class="small text-muted mt-n2">No sites yet. <a href="{{ url_for('sites.create') }}">Create a site</a> to monitor devices on a private network.</p>{% endif %}
+        {% endif %}
         {{ field(form.polling_interval, help='How often the device is checked: 10 s to 24 h. 60 s suits most small networks.') }}
         {{ field(form.enabled, help='Disabled devices keep their history but are not checked.') }}
         {% if not device %}{{ field(form.add_default_thresholds, help='Latency > 150 ms (warning) / > 500 ms (critical); packet loss > 25 % (warning) / ≥ 75 % (critical). You can edit these later.') }}{% endif %}
       </div></div>
       <div class="card"><div class="card-header"><h2>SNMP <span class="text-muted fw-normal small">optional</span></h2></div><div class="card-body">
-        {{ field(form.snmp_enabled, help='For devices running an SNMP v2c agent. Adds CPU and memory readings.') }}
+        {{ field(form.snmp_enabled, help='For devices running an SNMP v2c agent. Adds CPU and memory readings. Collected by the Netwatch server only — not yet by on-site agents.') }}
         {{ field(form.snmp_community, help=('Leave blank to keep the stored community string.' if device and device.snmp_community else 'Treat this like a password; it is never shown again.')) }}
       </div></div>
     </div>

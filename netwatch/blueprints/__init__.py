@@ -17,7 +17,7 @@ def admin_required(view):
 
 
 def register_blueprints(app):
-    from . import alerts, api, auth, dashboard, devices, history, reports, settings, users
-    for bp in (auth.bp, dashboard.bp, devices.bp, alerts.bp, history.bp, reports.bp, users.bp,
-               settings.bp, api.bp):
+    from . import agent_api, alerts, api, auth, dashboard, devices, history, reports, settings, sites, users
+    for bp in (auth.bp, dashboard.bp, devices.bp, sites.bp, alerts.bp, history.bp, reports.bp, users.bp,
+               settings.bp, api.bp, agent_api.bp):
         app.register_blueprint(bp)

@@ -78,6 +78,12 @@ class Config:
     PING_TIMEOUT_SECONDS = float(os.environ.get("PING_TIMEOUT_SECONDS", "2"))
     TCP_PROBE_PORTS = [int(p) for p in os.environ.get("TCP_PROBE_PORTS", "80,443,22").split(",") if p.strip()]
     MAX_PARALLEL_CHECKS = int(os.environ.get("MAX_PARALLEL_CHECKS", "8"))
+    # On-site agents (private LAN devices). Inside a LAN, ICMP normally works, so agents use
+    # ping first and fall back to TCP; the ports cover web, SSH, RDP, DNS and printer services.
+    AGENT_MONITOR_METHOD = os.environ.get("AGENT_MONITOR_METHOD", "auto").lower()  # auto|icmp|tcp
+    AGENT_TCP_PORTS = [int(p) for p in os.environ.get("AGENT_TCP_PORTS", "80,443,22,3389,53,9100").split(",")
+                       if p.strip()]
+    AGENT_POLL_SECONDS = int(os.environ.get("AGENT_POLL_SECONDS", "10"))
 
     # Email (SMTP) — all optional; alerts still appear in-app without them
     MAIL_SERVER = os.environ.get("MAIL_SERVER", "")

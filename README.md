@@ -137,6 +137,7 @@ If the script says packages are missing, you are not inside the virtual environm
 | Authentication | Login/logout, first-run admin setup, hashed passwords, 5-attempt lockout, session protection, CSRF on every form, admin vs viewer roles |
 | Devices | Register, edit, enable/disable, delete (with confirmation), search, filter by type/status/source, sortable columns, pagination, “Check now”; SNMP community strings are stored encrypted (key derived from `SECRET_KEY`) |
 | Monitoring | Scheduled checks at each device's own interval; ICMP via the OS `ping` command (Table 3.5) with TCP fallback; optional SNMP v2c CPU/memory; per-device lock + single scheduler |
+| Private LANs | **Sites & on-site agents**: a dependency-free agent (`agent/netwatch_agent.py`) runs inside the LAN, checks private addresses and reports to the cloud over HTTPS with a per-site key; agent-offline detection and alerts; “Check now” works through the agent ([docs/LAN_AGENT.md](docs/LAN_AGENT.md)) |
 | Metrics | Reachability, latency, packet loss, 24 h rolling uptime, stored per check with the method used |
 | Thresholds | Per-device rules (>, ≥, <, ≤) on latency, loss, uptime, CPU, memory; warning or critical |
 | Alerts | Device-down after N consecutive failures; one alert per condition; auto-resolve on recovery; acknowledge / close with notes; reminder suppression |
@@ -173,6 +174,18 @@ address to your router's IP and enable it.
 10. **Settings / Users** — configurable parameters, SMTP test, viewer account.
 11. **Tests** — run `python -m pytest` to show the automated test evidence (Objective 4).
 
+**Private LAN from the cloud (on-site agent, ~5 minutes extra)** — on the hosted copy:
+
+1. *Sites & agents → New site* (“Lab LAN”); copy the agent key shown once.
+2. *Add device to this site*: the router's private address from `ipconfig` (Default Gateway), plus an
+   address with nothing on it (e.g. `192.168.1.250`) to show a failure.
+3. On a laptop connected to that network: download the agent from the site page, then
+   `python netwatch_agent.py --server https://… --key nwa_… --save` and `python netwatch_agent.py`.
+4. Within seconds the router shows **Up** with real LAN latency and the empty address goes **Down** with
+   a critical alert — measured inside the private network, displayed in the cloud.
+5. Close the agent window: after the offline limit the site shows **Agent offline**, its devices
+   **Pending**, and agent-offline alerts open. Start it again and they resolve.
+
 ## 8. Known limitations
 
 * **ICMP in the cloud.** Many cloud hosts block raw ICMP; Netwatch then uses TCP-connect
@@ -183,8 +196,10 @@ address to your router's IP and enable it.
   close to the default 2-second probe timeout. On Windows Netwatch uses real `ping` (ICMP), so this only
   matters if you force `MONITOR_METHOD=tcp` there; raise `PING_TIMEOUT_SECONDS` to 4 or more if you do.
   The two tests that depend on this behaviour use a longer timeout on Windows.
-* **Cloud vs private LAN.** A cloud copy cannot reach private 192.168.x.x addresses without a
-  VPN or an on-site collector (the report's architecture permits adding one later, §2.4.2.2).
+* **Cloud vs private LAN.** A cloud server cannot reach private addresses (192.168.x.x, 10.x.x.x) by
+  itself. Netwatch solves this with an **on-site agent** (`agent/netwatch_agent.py`) that runs on a
+  computer inside the LAN and reports to the cloud over HTTPS — see [docs/LAN_AGENT.md](docs/LAN_AGENT.md).
+  The agent computer must stay on; agents do not yet collect SNMP.
 * **SNMP** is implemented (v2c; HOST-RESOURCES-MIB CPU, UCD-SNMP-MIB memory) but was only
   tested for graceful failure — no SNMP-enabled device was available. Vendor MIBs differ.
 * **Email** was tested against a local SMTP test server, not a real provider; use the test
@@ -209,10 +224,13 @@ netwatch/
   config.py                environment-driven configuration
   models.py                Table 3.4 schema (Users, Devices, Monitoring_Results, Thresholds, Alerts, Audit_Log)
   forms.py                 server-side validation
-  blueprints/              auth, dashboard, devices, alerts, history, reports, users, settings, api
-  services/                collector (ICMP/TCP/SNMP/simulated), monitor, alerting, notifier,
+  blueprints/              auth, dashboard, devices, sites, alerts, history, reports, users, settings,
+                           api, agent_api (key-authenticated API for on-site agents)
+  migrations.py            adds new columns to databases created by an earlier version
+  services/                collector (ICMP/TCP/SNMP/simulated), monitor, agents, alerting, notifier,
                            scheduler, stats, series, audit, settings, demo
+agent/netwatch_agent.py    on-site agent for private LANs (standard library only)
   templates/, static/      Jinja2 pages, CSS, JS, vendored Bootstrap / Chart.js / fonts (works offline)
 tests/                     pytest suite (backend, security, browser UI)
-docs/                      requirements checklist and verification report
+docs/                      requirements checklist, verification report, Render and LAN-agent guides
 ```

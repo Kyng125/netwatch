@@ -19,6 +19,9 @@ DEFAULTS = {
     "send_recovery_emails": (bool, True, "Email when a condition clears",
                              "Send a 'resolved' email when a device recovers or a metric returns to normal.",
                              None, None),
+    "agent_offline_minutes": (int, 3, "Agent offline after (minutes)",
+                              "If an on-site agent sends nothing for this long, its devices are marked "
+                              "unknown and an agent-offline alert is raised.", 1, 1440),
     "extra_alert_recipients": (str, "", "Additional alert recipients",
                                "Comma-separated email addresses that receive alerts in addition to users "
                                "who opted in.", None, None),

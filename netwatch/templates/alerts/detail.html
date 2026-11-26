@@ -14,7 +14,7 @@
   <div class="col-lg-7">
     <div class="card mb-3"><div class="card-header"><h2>Details</h2></div><div class="card-body"><dl class="kv">
       <dt>Device</dt><dd><a href="{{ url_for('devices.detail', device_id=a.device_id) }}">{{ a.device.device_name }}</a> <span class="mono small">({{ a.device.ip_address }})</span> {{ sim_badge(a.device.is_simulated) }}</dd>
-      <dt>Type</dt><dd>{{ 'Device unreachable' if a.alert_type == 'device_down' else 'Threshold breach' }}</dd>
+      <dt>Type</dt><dd>{{ {'device_down': 'Device unreachable', 'agent_offline': 'On-site agent offline (device not monitored)'}.get(a.alert_type, 'Threshold breach') }}</dd>
       {% if a.threshold %}<dt>Rule</dt><dd class="mono">{{ a.threshold.describe() }}</dd>{% elif a.metric_name %}<dt>Metric</dt><dd>{{ METRIC_LABELS.get(a.metric_name, a.metric_name) }} <span class="text-muted">(rule since removed)</span></dd>{% endif %}
       <dt>Opened</dt><dd>{{ a.opened_at|dt }} <span class="text-muted">({{ a.opened_at|ago }})</span></dd>
       <dt>Acknowledged</dt><dd>{% if a.acknowledged_at %}{{ a.acknowledged_at|dt }}{% if a.acknowledger %} by {{ a.acknowledger.username }}{% endif %}{% else %}—{% endif %}</dd>

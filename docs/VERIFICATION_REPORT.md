@@ -82,6 +82,35 @@ Manual / system checks also performed:
 * The release zip no longer contains `instance/` (secret key, database, logs).
 * The figures in section 3 above are from the original 16 October run and predate these changes.
 
+### Addendum — 26 November 2026 (on-site agents for private LANs, v2.1.0)
+
+New: Sites, per-site agent keys, the key-authenticated agent API, `agent/netwatch_agent.py`, agent-offline
+detection, and an idempotent schema upgrade (`netwatch/migrations.py`). Design and usage: `docs/LAN_AGENT.md`.
+
+* **Automated tests:** 37 new tests in `tests/test_agents.py` (key hashing, 401/403, CSRF exemption,
+  job selection, cross-site rejection, value validation, alert lifecycle from agent results, cloud
+  collector never probing LAN devices, offline/online with email, schema upgrade of an old SQLite file,
+  pages and roles, ping-parser parity between agent and server, unsafe-address rejection, and a real
+  end-to-end run of the agent program against a live HTTP server).
+  SQLite, including the 12 browser tests: **204 passed, 0 failed, 3 skipped**.
+  PostgreSQL 16 (`NETWATCH_TEST_DB_URL`, backend): **191 passed, 0 failed, 4 skipped**.
+  Skips: no `ping` binary in the sandbox (1); the sandbox network answers unroutable addresses (2);
+  the SQLite-only upgrade test under PostgreSQL (1).
+* **Upgrade of the live database:** a PostgreSQL database was created with the previous release
+  (`main`: `init-db` + `seed-public`, 12 devices, 72 results). The new version was then started on it
+  with the Render start command. `devices.site_id` (with its foreign key and index) and
+  `devices.check_requested_at` were added, all rows were kept, and a second start changed nothing.
+* **Rehearsal** (gunicorn + PostgreSQL, `MONITOR_METHOD=tcp` as on Render): site created and devices
+  registered in the browser; the agent program run with `--save`, `--once`, then continuously; one
+  reachable and one empty private address reported Up / Down with a critical device-down alert; agent
+  stopped → site *Agent offline*, devices *Pending*, agent-offline alerts and audit entries; agent
+  restarted → alerts resolved automatically. A temporary database outage was reported by `/healthz`
+  and recovered from without a restart.
+* **Defect found and fixed during the rehearsal:** the sandbox firewall refuses every outgoing
+  connection itself, so a non-existent LAN address looked *up* over TCP. The agent now tests a reserved
+  address (RFC 5737) once at start-up and, on such networks, counts only completed connections
+  (2 tests added). The server's own collector is unchanged; its existing limitation note still applies.
+
 ## 6. Report alignment — objectives → features → tests
 
 | Objective (§1.4) | Implemented feature | Evidence (tests) |

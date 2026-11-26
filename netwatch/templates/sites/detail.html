@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import agent_state, status_pill, post_button %}
+{% block title %}{{ s.name }}{% endblock %}
+{% block content %}
+{% set key_text = new_key or 'PASTE-THE-AGENT-KEY-HERE' %}
+<div class="page-head">
+  <div>
+    <a href="{{ url_for('sites.index') }}" class="small text-decoration-none"><i class="bi bi-arrow-left" aria-hidden="true"></i> Sites</a>
+    <h1 class="mt-1 d-flex flex-wrap align-items-center gap-2">{{ s.name }} {{ agent_state(s.connection_state) }}</h1>
+    <p>{{ s.description or 'Private network monitored by an on-site agent.' }}</p>
+  </div>
+  {% if current_user.is_admin %}
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-primary" href="{{ url_for('devices.create', site=s.site_id) }}"><i class="bi bi-plus-lg" aria-hidden="true"></i> Add device to this site</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('sites.edit', site_id=s.site_id) }}"><i class="bi bi-pencil" aria-hidden="true"></i> Edit</a>
+    {{ post_button(url_for('sites.rotate_key', site_id=s.site_id), 'New key', form, cls='btn btn-outline-secondary', icon='key',
+         confirm='Create a new agent key? The current key stops working immediately, so the running agent must be restarted with the new key.', confirm_title='Replace agent key') }}
+    {{ post_button(url_for('sites.delete', site_id=s.site_id), 'Delete', form, cls='btn btn-outline-danger', icon='trash',
+         confirm='Delete the site “' ~ s.name ~ '”? Its agent stops working. Its ' ~ s.devices|length ~ ' device(s) and their history are kept but disabled.', confirm_title='Delete site') }}
+  </div>
+  {% endif %}
+</div>
+
+{% if new_key %}
+<div class="key-box mb-3" role="alert">
+  <b><i class="bi bi-key-fill" aria-hidden="true"></i> Agent key for “{{ s.name }}” — copy it now.</b>
+  <code>{{ new_key }}</code>
+  <span class="small">It is shown only this once and is stored only as a hash. Treat it like a password: anyone with it can send results for this site. If you lose it, use <b>New key</b>.</span>
+</div>
+{% endif %}
+
+{% if s.connection_state == 'offline' %}
+<div class="alert alert-danger d-flex gap-2"><i class="bi bi-wifi-off mt-1" aria-hidden="true"></i><div><b>The agent has stopped reporting</b> (last report {{ s.last_seen_at|ago }}). The {{ s.devices|length }} device(s) below are not being monitored until it reconnects{% if active_offline %} — {{ active_offline }} agent-offline alert{{ 's' if active_offline != 1 }} open{% endif %}. Check that the agent computer is on, connected to this network and running the agent.</div></div>
+{% elif s.connection_state == 'disabled' %}
+<div class="alert alert-secondary"><i class="bi bi-pause-circle" aria-hidden="true"></i> This site is disabled: its agent is refused and its devices are not monitored.</div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-xl-5">
+    <div class="card mb-3"><div class="card-header"><h2>Agent</h2></div><div class="card-body">
+      <dl class="kv">
+        <dt>Status</dt><dd>{{ agent_state(s.connection_state) }}</dd>
+        <dt>Last report</dt><dd>{{ s.last_seen_at|dt if s.last_seen_at else 'never' }}{% if s.last_seen_at %} <span class="text-muted small">({{ s.last_seen_at|ago }})</span>{% endif %}</dd>
+        <dt>Agent computer</dt><dd>{{ s.agent_hostname or '—' }}</dd>
+        <dt>System</dt><dd>{{ s.agent_platform or '—' }}{% if s.agent_version %} · agent v{{ s.agent_version }}{% endif %}</dd>
+        <dt>Connects from</dt><dd class="mono">{{ s.agent_address or '—' }}</dd>
+        <dt>Agent key</dt><dd class="mono">{{ s.key_hint }}…</dd>
+        <dt>Reports</dt><dd>every {{ poll_seconds }} s; offline after {{ offline_after }} min of silence</dd>
+      </dl>
+    </div></div>
+
+    {% if current_user.is_admin %}
+    <div class="card" id="setup"><div class="card-header"><h2>Start the agent</h2></div>
+      <div class="card-body">
+        <p class="small text-muted">Do this once, on any Windows, macOS or Linux computer that is connected to this network and can stay switched on.</p>
+        <ol class="steps">
+          <li><b>Install Python 3.9 or newer</b> on that computer (Windows: python.org, tick “Add python.exe to PATH”). The agent needs nothing else — no extra packages.</li>
+          <li><b>Download the agent</b> into a folder of your choice:<br>
+            <a class="btn btn-sm btn-outline-primary mt-1" href="{{ url_for('sites.download_agent') }}"><i class="bi bi-download" aria-hidden="true"></i> netwatch_agent.py</a></li>
+          <li><b>Open a terminal in that folder</b> (Windows: Command Prompt, then <span class="mono">cd</span> to the folder) and save the connection settings once:
+            <code class="cmd mt-1">python netwatch_agent.py --server {{ server_url }} --key {{ key_text }} --save</code>
+            {% if not new_key %}<span class="small text-muted">The key is not shown again after it is created. Use <b>New key</b> above if you do not have it.</span>{% endif %}</li>
+          <li><b>Test it:</b> <code class="cmd mt-1">python netwatch_agent.py --once</code> This runs one round of checks and prints the results.</li>
+          <li><b>Run it continuously</b> and leave the window open: <code class="cmd mt-1">python netwatch_agent.py</code></li>
+        </ol>
+        <p class="small text-muted mt-3 mb-0"><i class="bi bi-search" aria-hidden="true"></i> To find the devices on the network, run <span class="mono">python netwatch_agent.py --scan</span> on the agent computer. It lists every address that answers, so you can register them here.</p>
+      </div></div>
+    {% endif %}
+  </div>
+
+  <div class="col-xl-7">
+    <div class="card"><div class="card-header"><h2>Devices on this site</h2>{% if current_user.is_admin %}<a class="small" href="{{ url_for('devices.create', site=s.site_id) }}">Add device →</a>{% endif %}</div>
+      {% if s.devices %}
+      <div class="table-responsive"><table class="table">
+        <thead><tr><th scope="col">Device</th><th scope="col">Address</th><th scope="col">Status</th><th scope="col">Last checked</th></tr></thead>
+        <tbody>{% for d in s.devices %}
+          <tr><td><a class="fw-semibold" href="{{ url_for('devices.detail', device_id=d.device_id) }}">{{ d.device_name }}</a><div class="small text-muted">{{ d.type_label }}</div></td>
+            <td class="mono">{{ d.ip_address }}</td><td>{{ status_pill(d.display_status) }}</td><td class="small">{{ d.last_checked_at|ago }}</td></tr>
+        {% endfor %}</tbody></table></div>
+      {% else %}
+      <div class="empty"><i class="bi bi-hdd-network" aria-hidden="true"></i><h3>No devices yet</h3>
+        <p>Register the router, switches, printers and other equipment on this network, with their private IP addresses{% if current_user.is_admin %}, and choose “{{ s.name }}” under “Checked from”{% endif %}.</p>
+        {% if current_user.is_admin %}<a class="btn btn-primary" href="{{ url_for('devices.create', site=s.site_id) }}"><i class="bi bi-plus-lg" aria-hidden="true"></i> Add device</a>{% endif %}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
