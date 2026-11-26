@@ -15,8 +15,11 @@ Two honest points for your supervisor:
 * **TCP, not ICMP.** A cloud host cannot send ICMP ping, so the hosted copy times a TCP connection instead and
   records `tcp` on every result. The report's ICMP method is demonstrated on your laptop
   (`python tools/verify_local.py`). Netwatch chooses the method automatically.
-* **The cloud copy cannot see your office LAN.** Private addresses such as 192.168.x.x are only reachable
-  from inside your network. That is why the hosted copy monitors public targets.
+* **The cloud server cannot see your office LAN by itself.** Private addresses such as 192.168.x.x are only
+  reachable from inside your network. To monitor them from this hosted copy, create a *site* and run the
+  on-site agent on a computer in that LAN — it reports to Render over HTTPS, no router changes needed.
+  See [LAN_AGENT.md](LAN_AGENT.md). Existing data is kept when you deploy this version: the start command's
+  `init-db` adds the two new `devices` columns automatically.
 
 ## Before you start
 

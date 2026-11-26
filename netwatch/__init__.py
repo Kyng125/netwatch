@@ -15,7 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from .config import INSTANCE_DIR, Config
 from .extensions import csrf, db, login_manager
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 
 @event.listens_for(Engine, "connect")
@@ -79,6 +79,8 @@ def create_app(config_object=Config, start_scheduler=None):
     with app.app_context():
         try:
             db.create_all()
+            from . import migrations
+            migrations.upgrade()
         except SQLAlchemyError:
             app.logger.exception("Database initialisation failed — check DATABASE_URL")
 

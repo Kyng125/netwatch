@@ -70,7 +70,8 @@ def alert_email(alert, kind, display_time):
     prefix = {"new": "ALERT", "reminder": "REMINDER", "resolved": "RESOLVED"}[kind]
     sev = alert.severity.upper()
     subject = f"[Netwatch] {prefix}: {d.device_name} — " + (
-        "device down" if alert.alert_type == "device_down" else alert.message.split(":")[0])
+        {"device_down": "device down", "agent_offline": "not monitored (agent offline)"}.get(
+            alert.alert_type) or alert.message.split(":")[0])
     if kind == "resolved":
         subject = f"[Netwatch] RESOLVED: {d.device_name} — condition cleared"
     sim = "\nNOTE: this is a SIMULATED demonstration device, not a real network observation.\n" if d.is_simulated else ""

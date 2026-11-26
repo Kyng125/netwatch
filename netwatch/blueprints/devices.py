@@ -1,7 +1,7 @@
 """Device management + per-device thresholds (FR3, FR7)."""
 from datetime import timedelta
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
@@ -70,6 +70,9 @@ def create():
     form = DeviceForm()
     if request.method == "GET":
         form.polling_interval.data = app_settings.get("default_polling_interval")
+        site_arg = request.args.get("site", type=int)
+        if site_arg and site_arg in {v for v, _l in form.site_id.choices}:
+            form.site_id.data = site_arg
     if form.validate_on_submit():
         d = Device(user_id=current_user.user_id)
         _apply(form, d)
@@ -94,8 +97,14 @@ def create():
 
 def _apply(form, d):
     d.device_name = form.device_name.data
-    if d.ip_address != form.ip_address.data:
+    new_site = form.site_id.data or None
+    if d.ip_address != form.ip_address.data or d.site_id != new_site:
         d.status, d.consecutive_failures = "unknown", 0
+        if d.device_id and d.site_id != new_site:
+            # measured from a different place now: any 'agent offline' alert no longer applies
+            for a in d.alerts.filter(Alert.alert_type == "agent_offline", Alert.status.in_(("open", "acknowledged"))):
+                alerting.resolve(a, note="Device moved to another collector", user_id=current_user.user_id)
+    d.site_id = new_site
     d.ip_address = form.ip_address.data
     d.device_type = form.device_type.data
     d.location = form.location.data or None
@@ -130,6 +139,7 @@ def edit(device_id):
     form = DeviceForm(obj=d, device_id=d.device_id)
     if request.method == "GET":
         form.snmp_community.data = ""  # never echo the stored secret back into the page
+        form.site_id.data = d.site_id or 0
     if form.validate_on_submit():
         was_enabled = d.enabled
         _apply(form, d)
@@ -187,6 +197,17 @@ def check_now(device_id):
         abort(400)
     if not d.enabled:
         flash("Enable monitoring for this device before running a check.", "warning")
+        return redirect(url_for("devices.detail", device_id=device_id))
+    if d.checked_by_agent:
+        site = d.site
+        d.check_requested_at = utcnow()
+        db.session.commit()
+        if site.connection_state == "online":
+            flash(f"Check requested. The agent at “{site.name}” will run it within about "
+                  f"{current_app.config['AGENT_POLL_SECONDS']} seconds — refresh the page to see the result.", "info")
+        else:
+            flash(f"Check requested, but the agent for “{site.name}” is {site.connection_state.replace('never', 'not connected yet')}. "
+                  "It will run when the agent reconnects.", "warning")
         return redirect(url_for("devices.detail", device_id=device_id))
     result = monitor.check_device(device_id)
     if result is None:

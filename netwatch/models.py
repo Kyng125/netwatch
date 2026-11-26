@@ -85,8 +85,14 @@ class Device(db.Model):
     last_checked_at = db.Column(db.DateTime)
     last_status_change_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    # Where the device is checked from. NULL = the Netwatch server itself (cloud collector);
+    # otherwise the on-site agent of that Site, which can reach private LAN addresses.
+    site_id = db.Column(db.Integer, db.ForeignKey("sites.site_id", ondelete="SET NULL"), index=True)
+    # Set by "Check now" on an agent-monitored device; the agent picks it up on its next poll.
+    check_requested_at = db.Column(db.DateTime)
 
     owner = db.relationship("User", back_populates="devices")
+    site = db.relationship("Site", back_populates="devices")
     results = db.relationship("MonitoringResult", back_populates="device", lazy="dynamic",
                               cascade="all, delete-orphan", passive_deletes=True)
     thresholds = db.relationship("Threshold", back_populates="device", lazy="select",
@@ -108,8 +114,64 @@ class Device(db.Model):
     def display_status(self):
         return "disabled" if not self.enabled else self.status
 
+    @property
+    def checked_by_agent(self):
+        return self.site_id is not None and not self.is_simulated
+
     def latest_result(self):
         return self.results.order_by(MonitoringResult.checked_at.desc()).first()
+
+
+# ---------------------------------------------------------------- Sites (on-site agents)
+class Site(db.Model):
+    """A private network (LAN) watched by an on-site Netwatch agent.
+
+    The cloud server cannot reach private addresses such as 192.168.x.x, so a small agent
+    program runs on a computer inside the LAN. It authenticates with a secret key, fetches
+    the devices assigned to its site, checks them locally and reports the results here.
+    Only a SHA-256 hash of the key is stored; the key itself is shown once, when created."""
+    __tablename__ = "sites"
+    KEY_PREFIX = "nwa_"
+
+    site_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.String(255))
+    agent_key_hash = db.Column(db.String(64), unique=True, nullable=False)
+    key_hint = db.Column(db.String(16), nullable=False)  # first characters, to tell keys apart
+    enabled = db.Column(db.Boolean, nullable=False, default=True)
+    last_seen_at = db.Column(db.DateTime)
+    agent_hostname = db.Column(db.String(100))
+    agent_platform = db.Column(db.String(100))
+    agent_version = db.Column(db.String(20))
+    agent_address = db.Column(db.String(45))  # public IP the agent connected from
+    agent_offline = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.user_id", ondelete="SET NULL"))
+
+    devices = db.relationship("Device", back_populates="site", lazy="select", order_by="Device.device_name")
+
+    @staticmethod
+    def hash_key(raw):
+        import hashlib
+        return hashlib.sha256((raw or "").strip().encode("utf-8")).hexdigest()
+
+    @classmethod
+    def new_key(cls):
+        import secrets
+        return cls.KEY_PREFIX + secrets.token_urlsafe(32)
+
+    def set_key(self, raw):
+        self.agent_key_hash = self.hash_key(raw)
+        self.key_hint = raw[:10]
+
+    @property
+    def connection_state(self):
+        """never | online | offline | disabled"""
+        if not self.enabled:
+            return "disabled"
+        if self.last_seen_at is None:
+            return "never"
+        return "offline" if self.agent_offline else "online"
 
 
 # ---------------------------------------------------------------- Monitoring_Results
@@ -188,7 +250,7 @@ class Threshold(db.Model):
 # ---------------------------------------------------------------- Alerts
 class Alert(db.Model):
     __tablename__ = "alerts"
-    TYPES = ("device_down", "threshold")
+    TYPES = ("device_down", "threshold", "agent_offline")
     STATUSES = ("open", "acknowledged", "resolved")
 
     alert_id = db.Column(db.Integer, primary_key=True)

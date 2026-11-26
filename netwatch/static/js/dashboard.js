@@ -12,6 +12,7 @@
   let chart = null, lastOk = Date.now();
 
   function pill(s) { return '<span class="status-pill status-' + s + '">' + (labels[s] || s) + "</span>"; }
+  function site(name) { return name ? '<span class="site-badge" title="Checked by the on-site agent for ' + esc(name) + '"><i class="bi bi-building" aria-hidden="true"></i>' + esc(name) + "</span>" : ""; }
   function sim(isSim) { return isSim ? '<span class="sim-badge" title="Simulated demonstration device"><i class="bi bi-cpu" aria-hidden="true"></i>Simulated</span>' : ""; }
 
   function renderStats(o) {
@@ -31,7 +32,7 @@
       '<a class="dev-tile is-' + d.status + '" href="' + devUrl(d.id) + '">' +
       '<div class="d-flex justify-content-between align-items-start gap-2"><div><div class="name">' + esc(d.name) +
       '</div><div class="meta mono">' + esc(d.ip) + "</div></div>" + pill(d.status) + "</div>" +
-      '<div class="meta mt-1">' + esc(d.type) + " " + sim(d.simulated) + "</div>" +
+      '<div class="meta mt-1">' + esc(d.type) + " " + sim(d.simulated) + " " + site(d.site) + "</div>" +
       '<div class="metrics"><div>Latency<b>' + fmt(d.latency, 1) + "</b></div><div>Loss<b>" + fmt(d.loss, 0, "%") +
       "</b></div><div>Uptime<b>" + fmt(d.uptime, 1, "%") + "</b></div></div>" +
       '<div class="meta mt-2">' + (d.checked ? "Checked " + esc(d.checked_ago) : "Not checked yet") +

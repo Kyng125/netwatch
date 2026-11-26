@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/_macros.html" import status_pill, sim_badge, sort_th, pagination, method_badge, post_button %}
+{% from "partials/_macros.html" import status_pill, sim_badge, site_badge, sort_th, pagination, method_badge, post_button %}
 {% block title %}Devices{% endblock %}
 {% block content %}
 {% set args = {'q': q, 'type': dtype, 'status': status, 'source': source, 'sort': sort, 'order': order, 'per_page': page.per_page} %}
@@ -42,7 +42,7 @@
       <tbody>
       {% for d in page.items %}{% set r = latest[d.device_id] %}
         <tr class="{{ 'row-down' if d.display_status == 'down' }}">
-          <td><a class="fw-semibold text-decoration-none" href="{{ url_for('devices.detail', device_id=d.device_id) }}">{{ d.device_name }}</a> {{ sim_badge(d.is_simulated) }}
+          <td><a class="fw-semibold text-decoration-none" href="{{ url_for('devices.detail', device_id=d.device_id) }}">{{ d.device_name }}</a> {{ sim_badge(d.is_simulated) }} {{ site_badge(d.site if d.checked_by_agent else None) }}
             {% if d.location %}<div class="small text-muted">{{ d.location }}</div>{% endif %}</td>
           <td class="mono small">{{ d.ip_address }}</td>
           <td>{{ d.type_label }}</td>

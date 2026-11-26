@@ -60,39 +60,15 @@ def check_device(device_id, now=None):
         device = db.session.get(Device, device_id)
         if device is None:
             return None
+        if device.checked_by_agent:
+            # A private-LAN device: the cloud server cannot reach it, so never probe it from here.
+            return None
         try:
             probe = run_probe(device)
         except Exception as exc:  # collector bug or OS error -> record failed check
             log.exception("Probe of device %s failed", device_id)
             probe = collector.ProbeResult(False, None, None, "icmp", f"Collector error: {type(exc).__name__}")
-
-        now = now or utcnow()
-        result = MonitoringResult(
-            device_id=device.device_id, checked_at=now, reachable=probe.reachable,
-            latency_ms=round(probe.latency_ms, 3) if probe.latency_ms is not None else None,
-            packet_loss_percent=probe.packet_loss_percent, cpu_percent=probe.cpu_percent,
-            memory_percent=probe.memory_percent, method=probe.method,
-            error_message=(probe.error or None) and probe.error[:255])
-        db.session.add(result)
-        db.session.flush()
-        result.uptime_percent = stats.uptime_percent(device.device_id, now - timedelta(hours=24), now)
-        device.last_checked_at = now
-        notifications = alerting.evaluate(device, result, now)
-        db.session.commit()
-
-        if notifications:
-            send_recovery = alerting.app_settings.get("send_recovery_emails")
-            for alert, kind in notifications:
-                if kind == "resolved" and not send_recovery:
-                    continue
-                subject, body = notifier.alert_email(alert, kind, fmt_dt)
-                status = notifier.send_email(subject, body)
-                if kind != "resolved":
-                    alert.email_status = status
-                    alert.last_notified_at = now
-                    alert.notification_count = (alert.notification_count or 0) + 1
-            db.session.commit()
-        return result
+        return record_probe(device, probe, now)
     except Exception:
         db.session.rollback()
         log.exception("Monitoring check for device %s could not be stored", device_id)
@@ -101,14 +77,56 @@ def check_device(device_id, now=None):
         lock.release()
 
 
-def due_device_ids(now=None):
-    """Enabled devices whose polling interval has elapsed."""
+def record_probe(device, probe, now=None):
+    """Store one measurement for `device` and run the alert logic (Fig 3.4 processes 2.0 → 4.0).
+
+    Shared by the cloud collector and by results reported from on-site agents, so both kinds of
+    measurement are stored, evaluated and notified in exactly the same way."""
     now = now or utcnow()
-    due = []
-    for d in Device.query.filter_by(enabled=True).all():
-        if d.last_checked_at is None or (now - d.last_checked_at).total_seconds() >= d.polling_interval - 1:
-            due.append(d.device_id)
-    return due
+    result = MonitoringResult(
+        device_id=device.device_id, checked_at=now, reachable=probe.reachable,
+        latency_ms=round(probe.latency_ms, 3) if probe.latency_ms is not None else None,
+        packet_loss_percent=probe.packet_loss_percent, cpu_percent=probe.cpu_percent,
+        memory_percent=probe.memory_percent, method=probe.method,
+        error_message=(probe.error or None) and probe.error[:255])
+    db.session.add(result)
+    db.session.flush()
+    result.uptime_percent = stats.uptime_percent(device.device_id, now - timedelta(hours=24), now)
+    device.last_checked_at = now
+    device.check_requested_at = None
+    notifications = alerting.evaluate(device, result, now)
+    db.session.commit()
+    send_notifications(notifications, now)
+    return result
+
+
+def send_notifications(notifications, now):
+    if not notifications:
+        return
+    send_recovery = alerting.app_settings.get("send_recovery_emails")
+    for alert, kind in notifications:
+        if kind == "resolved" and not send_recovery:
+            continue
+        subject, body = notifier.alert_email(alert, kind, fmt_dt)
+        status = notifier.send_email(subject, body)
+        if kind != "resolved":
+            alert.email_status = status
+            alert.last_notified_at = now
+            alert.notification_count = (alert.notification_count or 0) + 1
+    db.session.commit()
+
+
+def is_due(device, now):
+    return device.last_checked_at is None or (now - device.last_checked_at).total_seconds() >= device.polling_interval - 1
+
+
+def due_device_ids(now=None):
+    """Enabled devices whose polling interval has elapsed and that THIS server checks itself.
+
+    Devices assigned to a site are checked by that site's on-site agent instead."""
+    now = now or utcnow()
+    return [d.device_id for d in Device.query.filter_by(enabled=True).all()
+            if not d.checked_by_agent and is_due(d, now)]
 
 
 def purge_old_results(days):

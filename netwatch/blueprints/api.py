@@ -17,6 +17,7 @@ def _device_json(d, r):
     return {
         "id": d.device_id, "name": d.device_name, "ip": d.ip_address, "type": d.type_label,
         "status": d.display_status, "simulated": d.is_simulated,
+        "site": d.site.name if d.checked_by_agent else None,
         "latency": r.latency_ms if r else None, "loss": r.packet_loss_percent if r else None,
         "uptime": r.uptime_percent if r else None, "method": r.method if r else None,
         "checked": iso_utc(d.last_checked_at), "checked_ago": time_ago(d.last_checked_at),

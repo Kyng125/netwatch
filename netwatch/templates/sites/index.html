@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "partials/_macros.html" import agent_state, post_button %}
+{% block title %}Sites{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Sites &amp; on-site agents</h1>
+    <p>A site is a private network (LAN) — an office, a lab, a hotspot. Devices on it use private addresses such as
+      <span class="mono">192.168.1.1</span> or <span class="mono">10.150.121.187</span>, which the cloud server cannot reach.
+      A small agent program running on any computer inside that LAN checks them and reports the results here.</p></div>
+  {% if current_user.is_admin %}<a class="btn btn-primary" href="{{ url_for('sites.create') }}"><i class="bi bi-plus-lg" aria-hidden="true"></i> New site</a>{% endif %}
+</div>
+
+{% if unassigned_private and current_user.is_admin %}
+<div class="alert alert-warning d-flex gap-2"><i class="bi bi-exclamation-triangle mt-1" aria-hidden="true"></i><div>
+  <b>{{ unassigned_private|length }} device{{ 's' if unassigned_private|length != 1 }} with a private address {{ 'is' if unassigned_private|length == 1 else 'are' }} checked from the Netwatch server</b>, which cannot reach private networks:
+  {% for d in unassigned_private[:5] %}<a href="{{ url_for('devices.edit', device_id=d.device_id) }}">{{ d.device_name }}</a> <span class="mono small">({{ d.ip_address }})</span>{{ ', ' if not loop.last }}{% endfor %}{{ '…' if unassigned_private|length > 5 }}.
+  Edit {{ 'it' if unassigned_private|length == 1 else 'them' }} and choose a site under “Checked from”.</div></div>
+{% endif %}
+
+<div class="card">
+  {% if sites %}
+  <div class="table-responsive"><table class="table">
+    <thead><tr><th scope="col">Site</th><th scope="col">Agent</th><th scope="col">Last report</th><th scope="col">Agent computer</th><th scope="col" class="text-end">Devices</th></tr></thead>
+    <tbody>{% for s in sites %}
+      <tr><td><a class="fw-semibold" href="{{ url_for('sites.detail', site_id=s.site_id) }}">{{ s.name }}</a>
+            {% if s.description %}<div class="small text-muted">{{ s.description }}</div>{% endif %}</td>
+        <td>{{ agent_state(s.connection_state) }}</td>
+        <td class="small">{{ s.last_seen_at|ago }}</td>
+        <td class="small">{{ s.agent_hostname or '—' }}{% if s.agent_version %} <span class="text-muted">· agent v{{ s.agent_version }}</span>{% endif %}</td>
+        <td class="text-end num">{{ s.devices|selectattr('enabled')|list|length }}</td></tr>
+    {% endfor %}</tbody></table></div>
+  {% else %}
+  <div class="empty"><i class="bi bi-building" aria-hidden="true"></i><h3>No sites yet</h3>
+    <p>Create a site for each private network you want to monitor{% if current_user.is_admin %}, then follow the steps on its page to start the agent{% endif %}.</p>
+    {% if current_user.is_admin %}<a class="btn btn-primary" href="{{ url_for('sites.create') }}"><i class="bi bi-plus-lg" aria-hidden="true"></i> New site</a>{% endif %}</div>
+  {% endif %}
+</div>
+<p class="small text-muted mt-3 mb-0"><i class="bi bi-info-circle" aria-hidden="true"></i> An agent is shown offline after {{ offline_after }} minute{{ 's' if offline_after != 1 }} without a report (change this in Settings). Its devices are then shown as <i>Pending</i> rather than down, because the devices themselves may still be working.</p>
+{% endblock %}

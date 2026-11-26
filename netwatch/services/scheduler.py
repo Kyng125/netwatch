@@ -47,6 +47,12 @@ def tick(app):
     from ..models import utcnow
     with app.app_context():
         try:
+            from . import agents
+            agents.check_sites()
+        except Exception:
+            db.session.rollback()
+            log.exception("Scheduler could not check on-site agents")
+        try:
             ids = monitor.due_device_ids()
         except Exception:
             log.exception("Scheduler could not read the device list")
